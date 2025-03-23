@@ -1,0 +1,111 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+.form-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  background-color: #fff;
+}
+
+.card {
+  margin-bottom: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+  background-color: #f8f9fa;
+  font-weight: bold;
+}
+
+.btn-connect {
+  background-color: #6c5ce7;
+  border: none;
+}
+
+.btn-connect:hover {
+  background-color: #5649c0;
+}
+
+.btn-primary {
+  background-color: #0984e3;
+  border: none;
+}
+
+.btn-primary:hover {
+  background-color: #0769b5;
+}
+
+.btn-success {
+  background-color: #00b894;
+  border: none;
+}
+
+.btn-success:hover {
+  background-color: #00a382;
+}
+
+.navbar {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.nav-link.active {
+  font-weight: bold;
+  color: #0984e3 !important;
+}
+
+.estate-card {
+  transition: transform 0.3s;
+}
+
+.estate-card:hover {
+  transform: translateY(-5px);
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+.form-label {
+  font-weight: 500;
+}
+
+.alert {
+  margin-top: 20px;
+}
+
+.loading-spinner {
+  display: flex;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.chain-badge {
+  font-size: 0.8rem;
+  padding: 5px 10px;
+  border-radius: 20px;
+  margin-left: 10px;
+}
+
+.chain-badge.fuji {
+  background-color: #e84393;
+  color: white;
+}
+
+.chain-badge.sepolia {
+  background-color: #6c5ce7;
+  color: white;
+}

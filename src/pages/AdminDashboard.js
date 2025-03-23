@@ -1,0 +1,703 @@
+import React, { useState, useEffect } from 'react';
+import { Tab, Tabs, Card, Form, Button, Table, Alert, Spinner } from 'react-bootstrap';
+import { ethers } from 'ethers';
+import { getContracts, switchNetwork } from '../utils/interact';
+import { getAllNodeOperators } from '../utils/api';
+
+const AdminDashboard = ({ walletAddress, chainId }) => {
+  const [activeTab, setActiveTab] = useState('approveOperator');
+  const [contracts, setContracts] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [nodeOperators, setNodeOperators] = useState([]);
+  const [operators, setOperators] = useState([]);
+  
+  // Form states for various admin functions
+  const [tokenForAnotherChainForm, setTokenForAnotherChainForm] = useState({
+    baseAcceptedToken: '',
+    chainId: '',
+    tokenOnChain: ''
+  });
+  
+  const [collateralTokenForm, setCollateralTokenForm] = useState({
+    newToken: '',
+    dataFeed: ''
+  });
+  
+  const [vovImplementationForm, setVovImplementationForm] = useState({
+    newImplementation: ''
+  });
+  
+  const [swapRouterForm, setSwapRouterForm] = useState({
+    newRouter: ''
+  });
+  
+  const [forceUpdateForm, setForceUpdateForm] = useState({
+    operatorVaultEns: ''
+  });
+  
+  const [slashOperatorForm, setSlashOperatorForm] = useState({
+    operatorVaultEns: '',
+    slashAmount: ''
+  });
+  
+  const [emergencyWithdrawForm, setEmergencyWithdrawForm] = useState({
+    token: ''
+  });
+  
+  const [allowlistManagerForm, setAllowlistManagerForm] = useState({
+    chainSelector: '',
+    manager: ''
+  });
+
+  useEffect(() => {
+    const loadContracts = async () => {
+      if (walletAddress && chainId) {
+        const contractInstances = getContracts(chainId);
+        if (contractInstances && !contractInstances.error) {
+          setContracts(contractInstances);
+          
+          // Load operators from RealEstateRegistry
+          try {
+            const allOperators = await contractInstances.realEstateRegistry.getAllOperators();
+            setOperators(allOperators);
+          } catch (error) {
+            console.error('Error loading operators:', error);
+          }
+        } else if (contractInstances && contractInstances.error) {
+          setError(contractInstances.error);
+        }
+      }
+    };
+    
+    const loadNodeOperators = async () => {
+      try {
+        const data = await getAllNodeOperators();
+        setNodeOperators(data.nodes || []);
+      } catch (error) {
+        console.error('Error loading node operators:', error);
+      }
+    };
+    
+    loadContracts();
+    loadNodeOperators();
+  }, [walletAddress, chainId]);
+
+  const handleInputChange = (e, formSetter) => {
+    const { name, value } = e.target;
+    formSetter(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSetTokenForAnotherChain = async (e) => {
+    e.preventDefault();
+    if (!contracts || !contracts.realEstateRegistry) {
+      setError('Contracts not loaded');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const tx = await contracts.realEstateRegistry.setTokenForAnotherChain(
+        tokenForAnotherChainForm.baseAcceptedToken,
+        tokenForAnotherChainForm.chainId,
+        tokenForAnotherChainForm.tokenOnChain
+      );
+      
+      await tx.wait();
+      setSuccess('Token for another chain set successfully!');
+      setTokenForAnotherChainForm({
+        baseAcceptedToken: '',
+        chainId: '',
+        tokenOnChain: ''
+      });
+    } catch (error) {
+      setError(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddCollateralToken = async (e) => {
+    e.preventDefault();
+    if (!contracts || !contracts.realEstateRegistry) {
+      setError('Contracts not loaded');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const tx = await contracts.realEstateRegistry.addCollateralToken(
+        collateralTokenForm.newToken,
+        collateralTokenForm.dataFeed
+      );
+      
+      await tx.wait();
+      setSuccess('Collateral token added successfully!');
+      setCollateralTokenForm({
+        newToken: '',
+        dataFeed: ''
+      });
+    } catch (error) {
+      setError(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateVOVImplementation = async (e) => {
+    e.preventDefault();
+    if (!contracts || !contracts.realEstateRegistry) {
+      setError('Contracts not loaded');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const tx = await contracts.realEstateRegistry.updateVOVImplementation(
+        vovImplementationForm.newImplementation
+      );
+      
+      await tx.wait();
+      setSuccess('VOV implementation updated successfully!');
+      setVovImplementationForm({
+        newImplementation: ''
+      });
+    } catch (error) {
+      setError(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSetSwapRouter = async (e) => {
+    e.preventDefault();
+    if (!contracts || !contracts.realEstateRegistry) {
+      setError('Contracts not loaded');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const tx = await contracts.realEstateRegistry.setSwapRouter(
+        swapRouterForm.newRouter
+      );
+      
+      await tx.wait();
+      setSuccess('Swap router set successfully!');
+      setSwapRouterForm({
+        newRouter: ''
+      });
+    } catch (error) {
+      setError(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApproveOperatorVault = async (operatorVaultEns) => {
+    if (!contracts || !contracts.realEstateRegistry) {
+      setError('Contracts not loaded');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const tx = await contracts.realEstateRegistry.approveOperatorVault(operatorVaultEns);
+      await tx.wait();
+      setSuccess(`Operator vault ${operatorVaultEns} approved successfully!`);
+      
+      // Update node operator status in backend
+      const nodeOperator = nodeOperators.find(node => node.ensName === operatorVaultEns);
+      if (nodeOperator) {
+        // You would update the node operator status in the backend here
+        // For now, we'll just update the local state
+        setNodeOperators(prev => 
+          prev.map(node => 
+            node.ensName === operatorVaultEns 
+              ? { ...node, isApproved: true } 
+              : node
+          )
+        );
+      }
+    } catch (error) {
+      setError(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForceUpdateOperatorVault = async (e) => {
+    e.preventDefault();
+    if (!contracts || !contracts.realEstateRegistry) {
+      setError('Contracts not loaded');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const tx = await contracts.realEstateRegistry.forceUpdateOperatorVault(
+        forceUpdateForm.operatorVaultEns
+      );
+      
+      await tx.wait();
+      setSuccess('Operator vault force updated successfully!');
+      setForceUpdateForm({
+        operatorVaultEns: ''
+      });
+    } catch (error) {
+      setError(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSlashOperatorVault = async (e) => {
+    e.preventDefault();
+    if (!contracts || !contracts.realEstateRegistry) {
+      setError('Contracts not loaded');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const tx = await contracts.realEstateRegistry.slashOperatorVault(
+        slashOperatorForm.operatorVaultEns,
+        ethers.utils.parseEther(slashOperatorForm.slashAmount)
+      );
+      
+      await tx.wait();
+      setSuccess('Operator vault slashed successfully!');
+      setSlashOperatorForm({
+        operatorVaultEns: '',
+        slashAmount: ''
+      });
+    } catch (error) {
+      setError(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEmergencyWithdrawToken = async (e) => {
+    e.preventDefault();
+    if (!contracts || !contracts.realEstateRegistry) {
+      setError('Contracts not loaded');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const tx = await contracts.realEstateRegistry.emergencyWithdrawToken(
+        emergencyWithdrawForm.token
+      );
+      
+      await tx.wait();
+      setSuccess('Emergency token withdrawal successful!');
+      setEmergencyWithdrawForm({
+        token: ''
+      });
+    } catch (error) {
+      setError(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAllowlistManager = async (e) => {
+    e.preventDefault();
+    if (!contracts || !contracts.assetTokenizationManager) {
+      setError('Contracts not loaded');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const tx = await contracts.assetTokenizationManager.allowlistManager(
+        allowlistManagerForm.chainSelector,
+        allowlistManagerForm.manager
+      );
+      
+      await tx.wait();
+      setSuccess('Manager allowlisted successfully!');
+      setAllowlistManagerForm({
+        chainSelector: '',
+        manager: ''
+      });
+    } catch (error) {
+      setError(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!walletAddress) {
+    return (
+      <div className="text-center">
+        <h2>Please connect your wallet to access the Admin Dashboard</h2>
+      </div>
+    );
+  }
+
+  if (!chainId) {
+    return (
+      <div className="text-center">
+        <h2>Please connect to a supported network</h2>
+        <div className="mt-4">
+          <Button 
+            variant="primary" 
+            className="me-2"
+            onClick={() => switchNetwork(43113)}
+          >
+            Switch to Fuji
+          </Button>
+          <Button 
+            variant="primary"
+            onClick={() => switchNetwork(11155111)}
+          >
+            Switch to Sepolia
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="admin-dashboard">
+      <h2 className="mb-4">Admin Dashboard</h2>
+      
+      {error && <Alert variant="danger">{error}</Alert>}
+      {success && <Alert variant="success">{success}</Alert>}
+      
+      {loading && (
+        <div className="text-center mb-4">
+          <Spinner animation="border" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </Spinner>
+        </div>
+      )}
+      
+      <Tabs
+        activeKey={activeTab}
+        onSelect={(k) => setActiveTab(k)}
+        className="mb-4"
+      >
+        <Tab eventKey="approveOperator" title="Approve Operators">
+          <Card>
+            <Card.Body>
+              <h4>Node Operators</h4>
+              <Table responsive striped bordered hover>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>ENS Name</th>
+                    <th>ETH Address</th>
+                    <th>Vault Address</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {nodeOperators.map((node, index) => (
+                    <tr key={index}>
+                      <td>{node.name}</td>
+                      <td>{node.ensName}</td>
+                      <td>{node.ethAddress}</td>
+                      <td>{node.vaultAddress || 'Not registered'}</td>
+                      <td>{node.isApproved ? 'Approved' : 'Pending'}</td>
+                      <td>
+                        {!node.isApproved && node.ensName && (
+                          <Button 
+                            variant="success" 
+                            size="sm"
+                            onClick={() => handleApproveOperatorVault(node.ensName)}
+                            disabled={loading}
+                          >
+                            Approve
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {nodeOperators.length === 0 && (
+                    <tr>
+                      <td colSpan="6" className="text-center">No node operators found</td>
+                    </tr>
+                  )}
+                </tbody>
+              </Table>
+            </Card.Body>
+          </Card>
+        </Tab>
+        
+        <Tab eventKey="tokenConfig" title="Token Configuration">
+          <Card>
+            <Card.Body>
+              <h4>Set Token For Another Chain</h4>
+              <Form onSubmit={handleSetTokenForAnotherChain}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Base Accepted Token</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="baseAcceptedToken"
+                    value={tokenForAnotherChainForm.baseAcceptedToken}
+                    onChange={(e) => handleInputChange(e, setTokenForAnotherChainForm)}
+                    placeholder="0x..."
+                    required
+                  />
+                </Form.Group>
+                
+                <Form.Group className="mb-3">
+                  <Form.Label>Chain ID</Form.Label>
+                  <Form.Control
+                    type="number"
+                    name="chainId"
+                    value={tokenForAnotherChainForm.chainId}
+                    onChange={(e) => handleInputChange(e, setTokenForAnotherChainForm)}
+                    required
+                  />
+                </Form.Group>
+                
+                <Form.Group className="mb-3">
+                  <Form.Label>Token On Chain</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="tokenOnChain"
+                    value={tokenForAnotherChainForm.tokenOnChain}
+                    onChange={(e) => handleInputChange(e, setTokenForAnotherChainForm)}
+                    placeholder="0x..."
+                    required
+                  />
+                </Form.Group>
+                
+                <Button variant="primary" type="submit" disabled={loading}>
+                  Set Token For Another Chain
+                </Button>
+              </Form>
+              
+              <hr />
+              
+              <h4>Add Collateral Token</h4>
+              <Form onSubmit={handleAddCollateralToken}>
+                <Form.Group className="mb-3">
+                  <Form.Label>New Token</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="newToken"
+                    value={collateralTokenForm.newToken}
+                    onChange={(e) => handleInputChange(e, setCollateralTokenForm)}
+                    placeholder="0x..."
+                    required
+                  />
+                </Form.Group>
+                
+                <Form.Group className="mb-3">
+                  <Form.Label>Data Feed</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="dataFeed"
+                    value={collateralTokenForm.dataFeed}
+                    onChange={(e) => handleInputChange(e, setCollateralTokenForm)}
+                    placeholder="0x..."
+                    required
+                  />
+                </Form.Group>
+                
+                <Button variant="primary" type="submit" disabled={loading}>
+                  Add Collateral Token
+                </Button>
+              </Form>
+            </Card.Body>
+          </Card>
+        </Tab>
+        
+        <Tab eventKey="systemConfig" title="System Configuration">
+          <Card>
+            <Card.Body>
+              <h4>Update VOV Implementation</h4>
+              <Form onSubmit={handleUpdateVOVImplementation}>
+                <Form.Group className="mb-3">
+                  <Form.Label>New Implementation</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="newImplementation"
+                    value={vovImplementationForm.newImplementation}
+                    onChange={(e) => handleInputChange(e, setVovImplementationForm)}
+                    placeholder="0x..."
+                    required
+                  />
+                </Form.Group>
+                
+                <Button variant="primary" type="submit" disabled={loading}>
+                  Update VOV Implementation
+                </Button>
+              </Form>
+              
+              <hr />
+              
+              <h4>Set Swap Router</h4>
+              <Form onSubmit={handleSetSwapRouter}>
+                <Form.Group className="mb-3">
+                  <Form.Label>New Router</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="newRouter"
+                    value={swapRouterForm.newRouter}
+                    onChange={(e) => handleInputChange(e, setSwapRouterForm)}
+                    placeholder="0x..."
+                    required
+                  />
+                </Form.Group>
+                
+                <Button variant="primary" type="submit" disabled={loading}>
+                  Set Swap Router
+                </Button>
+              </Form>
+              
+              <hr />
+              
+              <h4>Allowlist Manager</h4>
+              <Form onSubmit={handleAllowlistManager}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Chain Selector</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="chainSelector"
+                    value={allowlistManagerForm.chainSelector}
+                    onChange={(e) => handleInputChange(e, setAllowlistManagerForm)}
+                    required
+                  />
+                </Form.Group>
+                
+                <Form.Group className="mb-3">
+                  <Form.Label>Manager</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="manager"
+                    value={allowlistManagerForm.manager}
+                    onChange={(e) => handleInputChange(e, setAllowlistManagerForm)}
+                    placeholder="0x..."
+                    required
+                  />
+                </Form.Group>
+                
+                <Button variant="primary" type="submit" disabled={loading}>
+                  Allowlist Manager
+                </Button>
+              </Form>
+            </Card.Body>
+          </Card>
+        </Tab>
+        
+        <Tab eventKey="operatorManagement" title="Operator Management">
+          <Card>
+            <Card.Body>
+              <h4>Force Update Operator Vault</h4>
+              <Form onSubmit={handleForceUpdateOperatorVault}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Operator Vault ENS</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="operatorVaultEns"
+                    value={forceUpdateForm.operatorVaultEns}
+                    onChange={(e) => handleInputChange(e, setForceUpdateForm)}
+                    required
+                  />
+                </Form.Group>
+                
+                <Button variant="warning" type="submit" disabled={loading}>
+                  Force Update Operator Vault
+                </Button>
+              </Form>
+              
+              <hr />
+              
+              <h4>Slash Operator Vault</h4>
+              <Form onSubmit={handleSlashOperatorVault}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Operator Vault ENS</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="operatorVaultEns"
+                    value={slashOperatorForm.operatorVaultEns}
+                    onChange={(e) => handleInputChange(e, setSlashOperatorForm)}
+                    required
+                  />
+                </Form.Group>
+                
+                <Form.Group className="mb-3">
+                  <Form.Label>Slash Amount (ETH)</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="slashAmount"
+                    value={slashOperatorForm.slashAmount}
+                    onChange={(e) => handleInputChange(e, setSlashOperatorForm)}
+                    required
+                  />
+                </Form.Group>
+                
+                <Button variant="danger" type="submit" disabled={loading}>
+                  Slash Operator Vault
+                </Button>
+              </Form>
+            </Card.Body>
+          </Card>
+        </Tab>
+        
+        <Tab eventKey="emergency" title="Emergency">
+          <Card>
+            <Card.Body>
+              <h4>Emergency Withdraw Token</h4>
+              <Form onSubmit={handleEmergencyWithdrawToken}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Token</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="token"
+                    value={emergencyWithdrawForm.token}
+                    onChange={(e) => handleInputChange(e, setEmergencyWithdrawForm)}
+                    placeholder="0x..."
+                    required
+                  />
+                </Form.Group>
+                
+                <Button variant="danger" type="submit" disabled={loading}>
+                  Emergency Withdraw Token
+                </Button>
+              </Form>
+            </Card.Body>
+          </Card>
+        </Tab>
+      </Tabs>
+    </div>
+  );
+};
+
+export default AdminDashboard;

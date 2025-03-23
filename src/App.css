@@ -1,0 +1,177 @@
+/* App.css - Custom styling for Real Estate Tokenization Platform */
+
+/* General Styles */
+body {
+  font-family: 'Roboto', sans-serif;
+  background-color: #f8f9fa;
+}
+
+.App {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.container {
+  flex: 1;
+}
+
+/* Navigation Styles */
+.navbar-brand {
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.nav-link.active {
+  font-weight: 600;
+  color: #3498db !important;
+}
+
+.chain-badge {
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  margin-right: 10px;
+  font-weight: 600;
+}
+
+.chain-badge.fuji {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.chain-badge.sepolia {
+  background-color: #3498db;
+  color: white;
+}
+
+/* Home Page Styles */
+.home-container h1 {
+  color: #2c3e50;
+  margin-bottom: 2rem;
+}
+
+.home-container .card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  height: 100%;
+}
+
+.home-container .card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.home-container .card-title {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+/* Dashboard Styles */
+.admin-dashboard h2,
+.node-operator-dashboard h2,
+.estate-owner-dashboard h2,
+.user-dashboard h2 {
+  color: #2c3e50;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+}
+
+.admin-dashboard .card,
+.node-operator-dashboard .card,
+.estate-owner-dashboard .card,
+.user-dashboard .card {
+  margin-bottom: 1.5rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.admin-dashboard .card-header,
+.node-operator-dashboard .card-header,
+.estate-owner-dashboard .card-header,
+.user-dashboard .card-header {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  color: #2c3e50;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.admin-dashboard .table th,
+.node-operator-dashboard .table th,
+.estate-owner-dashboard .table th,
+.user-dashboard .table th {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.admin-dashboard .nav-tabs .nav-link,
+.node-operator-dashboard .nav-tabs .nav-link,
+.estate-owner-dashboard .nav-tabs .nav-link {
+  color: #7f8c8d;
+  font-weight: 500;
+}
+
+.admin-dashboard .nav-tabs .nav-link.active,
+.node-operator-dashboard .nav-tabs .nav-link.active,
+.estate-owner-dashboard .nav-tabs .nav-link.active {
+  color: #3498db;
+  font-weight: 600;
+}
+
+/* Form Styles */
+.form-label {
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.form-control:focus {
+  border-color: #3498db;
+  box-shadow: 0 0 0 0.25rem rgba(52, 152, 219, 0.25);
+}
+
+/* Button Styles */
+.btn-primary {
+  background-color: #3498db;
+  border-color: #3498db;
+}
+
+.btn-primary:hover {
+  background-color: #2980b9;
+  border-color: #2980b9;
+}
+
+.btn-success {
+  background-color: #2ecc71;
+  border-color: #2ecc71;
+}
+
+.btn-success:hover {
+  background-color: #27ae60;
+  border-color: #27ae60;
+}
+
+.btn-danger {
+  background-color: #e74c3c;
+  border-color: #e74c3c;
+}
+
+.btn-danger:hover {
+  background-color: #c0392b;
+  border-color: #c0392b;
+}
+
+/* User Dashboard Token Cards */
+.user-dashboard .card {
+  transition: transform 0.3s ease;
+}
+
+.user-dashboard .card:hover {
+  transform: translateY(-5px);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .home-container .card {
+    margin-bottom: 1rem;
+  }
+}
