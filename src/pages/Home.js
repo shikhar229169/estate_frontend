@@ -65,8 +65,10 @@ const Home = ({ walletAddress, connectWalletPressed, setRole, role }) => {
     try {
       setLoading(true);
       const data = await adminLogin(loginData.email, loginData.password);
+      console.log(data)
+      console.log(data.data.user.ethAddress)
       
-      if (data.admin.ethAddress.toLowerCase() !== walletAddress.toLowerCase()) {
+      if (data.data.user.ethAddress.toLowerCase() !== walletAddress.toLowerCase()) {
         setError('Wallet address does not match the registered admin address');
         setLoading(false);
         return;
