@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Tab, Tabs, Card, Form, Button, Table, Alert, Spinner } from 'react-bootstrap';
 import { ethers } from 'ethers';
 import { getContracts, switchNetwork } from '../utils/interact';
-import { getAllNodeOperators } from '../utils/api';
+import { getAllNodeOperators, updateNodeOperator } from '../utils/api';
 
 const AdminDashboard = ({ walletAddress, chainId }) => {
   const [activeTab, setActiveTab] = useState('approveOperator');
@@ -39,7 +39,6 @@ const AdminDashboard = ({ walletAddress, chainId }) => {
   
   const [slashOperatorForm, setSlashOperatorForm] = useState({
     operatorVaultEns: '',
-    slashAmount: ''
   });
   
   const [emergencyWithdrawForm, setEmergencyWithdrawForm] = useState({
@@ -74,7 +73,7 @@ const AdminDashboard = ({ walletAddress, chainId }) => {
     const loadNodeOperators = async () => {
       try {
         const data = await getAllNodeOperators();
-        setNodeOperators(data.nodes || []);
+        setNodeOperators(data.data.nodes || []);
       } catch (error) {
         console.error('Error loading node operators:', error);
       }
@@ -133,6 +132,7 @@ const AdminDashboard = ({ walletAddress, chainId }) => {
     setSuccess('');
     
     try {
+      console.log(contracts.realEstateRegistry);
       const tx = await contracts.realEstateRegistry.addCollateralToken(
         collateralTokenForm.newToken,
         collateralTokenForm.dataFeed
@@ -225,15 +225,19 @@ const AdminDashboard = ({ walletAddress, chainId }) => {
       // Update node operator status in backend
       const nodeOperator = nodeOperators.find(node => node.ensName === operatorVaultEns);
       if (nodeOperator) {
-        // You would update the node operator status in the backend here
-        // For now, we'll just update the local state
-        setNodeOperators(prev => 
-          prev.map(node => 
-            node.ensName === operatorVaultEns 
-              ? { ...node, isApproved: true } 
-              : node
-          )
-        );
+        try {
+          await updateNodeOperator(nodeOperator._id, { isApproved: true });
+          // Update local state
+          setNodeOperators(prev => 
+            prev.map(node => 
+              node.ensName === operatorVaultEns 
+                ? { ...node, isApproved: true } 
+                : node
+            )
+          );
+        } catch (error) {
+          console.error('Failed to update node operator status in backend:', error);
+        }
       }
     } catch (error) {
       setError(`Error: ${error.message}`);
@@ -284,14 +288,31 @@ const AdminDashboard = ({ walletAddress, chainId }) => {
     try {
       const tx = await contracts.realEstateRegistry.slashOperatorVault(
         slashOperatorForm.operatorVaultEns,
-        ethers.utils.parseEther(slashOperatorForm.slashAmount)
       );
       
       await tx.wait();
       setSuccess('Operator vault slashed successfully!');
+
+      // Update node operator status in backend
+      const nodeOperator = nodeOperators.find(node => node.ensName === slashOperatorForm.operatorVaultEns);
+      if (nodeOperator) {
+        try {
+          await updateNodeOperator(nodeOperator._id, { isApproved: false });
+          // Update local state
+          setNodeOperators(prev => 
+            prev.map(node => 
+              node.ensName === slashOperatorForm.operatorVaultEns 
+                ? { ...node, isApproved: false } 
+                : node
+            )
+          );
+        } catch (error) {
+          console.error('Failed to update node operator status in backend:', error);
+        }
+      }
+
       setSlashOperatorForm({
         operatorVaultEns: '',
-        slashAmount: ''
       });
     } catch (error) {
       setError(`Error: ${error.message}`);
@@ -651,18 +672,6 @@ const AdminDashboard = ({ walletAddress, chainId }) => {
                     required
                   />
                 </Form.Group>
-                
-                <Form.Group className="mb-3">
-                  <Form.Label>Slash Amount (ETH)</Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="slashAmount"
-                    value={slashOperatorForm.slashAmount}
-                    onChange={(e) => handleInputChange(e, setSlashOperatorForm)}
-                    required
-                  />
-                </Form.Group>
-                
                 <Button variant="danger" type="submit" disabled={loading}>
                   Slash Operator Vault
                 </Button>

@@ -106,6 +106,11 @@ const Home = ({ walletAddress, connectWalletPressed, setRole, role }) => {
         setLoading(false);
         return;
       }
+
+      // const ensName = nodeOperator.ensName;
+      // const vaultAddress = nodeOperator.vaultAddress;
+      // const collateralToken = nodeOperator.paymentToken;
+      // const status = nodeOperator.isApproved ? "Approved" : "Not Approved";
       
       localStorage.setItem('token', data.token);
       localStorage.setItem('nodeOperatorId', nodeOperator._id);

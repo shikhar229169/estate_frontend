@@ -318,7 +318,7 @@ export const registerNodeOperator = async (nodeData) => {
 
 export const updateNodeOperator = async (nodeId, nodeData) => {
   try {
-    const response = await api.patch(`/node/${nodeId}`, nodeData);
+    const response = await api.patch(`/admin/nodes/${nodeId}`, nodeData);
     return response.data;
   } catch (error) {
     console.error('Node operator update error:', error);
@@ -328,7 +328,7 @@ export const updateNodeOperator = async (nodeId, nodeData) => {
 
 export const getAllNodeOperators = async () => {
   try {
-    const response = await api.get('/node');
+    const response = await api.get('/admin/nodes');
     return response.data;
   } catch (error) {
     console.error('Failed to get all node operators:', error);
@@ -399,8 +399,11 @@ export const getEstateOwnerByAddress = async (ethAddress) => {
 
 export const getEstateOwnersByNodeOperator = async (nodeOperatorEns) => {
   try {
-    const response = await api.get(`/user/node/${nodeOperatorEns}`);
-    return response.data;
+    const response = await api.get(`/node/users`);
+    const estateOwners = response.data.data.users;
+    return estateOwners.filter((estateOwner) => {
+      return estateOwner.nodeOperatorAssigned === nodeOperatorEns;
+    });
   } catch (error) {
     console.error('Failed to get estate owners by node operator:', error);
     throw error;

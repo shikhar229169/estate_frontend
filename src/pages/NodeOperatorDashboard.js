@@ -14,6 +14,8 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
   const [nodeOperatorEns, setNodeOperatorEns] = useState('');
   const [nodeOperatorInfo, setNodeOperatorInfo] = useState(null);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [tokenDecimals, setTokenDecimals] = useState(18); // Default to 18 for native token
+  const [tokenSymbol, setTokenSymbol] = useState(''); // For storing the token symbol
   
   // Form states for various node operator functions
   const [registerVaultForm, setRegisterVaultForm] = useState({
@@ -50,6 +52,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
             if (nodeInfo && nodeInfo.vaultAddress !== ethers.constants.AddressZero) {
               setIsRegistered(true);
               setNodeOperatorInfo(nodeInfo);
+              setNodeOperatorEns(nodeInfo.ensName)
               console.log('Node operator info:', nodeInfo);
               
               // Also fetch info from backend
@@ -90,8 +93,9 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
       if (nodeOperatorEns) {
         try {
           setLoading(true);
-          const data = await getEstateOwnersByNodeOperator(nodeOperatorEns);
-          setEstateOwners(data.estateOwners || []);
+          const estateOwners = await getEstateOwnersByNodeOperator(nodeOperatorEns);
+          // Here users conatins estate owners
+          setEstateOwners(estateOwners || []);
         } catch (error) {
           console.error('Error loading estate owners:', error);
         } finally {
@@ -102,6 +106,64 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
     
     loadEstateOwners();
   }, [nodeOperatorEns]);
+
+  useEffect(() => {
+    const getTokenInfo = async () => {
+      if (nodeOperatorInfo && nodeOperatorInfo.token) {
+        if (nodeOperatorInfo.token === ethers.constants.AddressZero) {
+          // For native token, get symbol based on chain
+          setTokenSymbol(getNativeCurrencySymbol(chainId));
+          setTokenDecimals(18);
+        } else {
+          try {
+            const erc20 = new ethers.Contract(
+              nodeOperatorInfo.token,
+              [
+                'function decimals() view returns (uint8)',
+                'function symbol() view returns (string)'
+              ],
+              contracts.provider
+            );
+            const [decimals, symbol] = await Promise.all([
+              erc20.decimals(),
+              erc20.symbol()
+            ]);
+            setTokenDecimals(decimals);
+            setTokenSymbol(symbol);
+          } catch (error) {
+            console.error('Error getting token info:', error);
+            setTokenDecimals(18);
+            setTokenSymbol('Tokens');
+          }
+        }
+      }
+    };
+
+    getTokenInfo();
+  }, [nodeOperatorInfo, contracts, chainId]);
+
+  // Helper function to get native currency symbol based on chain ID
+  const getNativeCurrencySymbol = (chainId) => {
+    switch (chainId) {
+      case 43113: // Avalanche Fuji
+        return 'AVAX';
+      case 11155111: // Ethereum Sepolia
+        return 'ETH';
+      default:
+        return 'ETH';
+    }
+  };
+
+  const formatTokenAmount = (amount) => {
+    if (!amount) return '0';
+    try {
+      const ethersFormattedAmount =  ethers.utils.formatUnits(amount, tokenDecimals);
+      return ethersFormattedAmount.includes('.') ? ethersFormattedAmount.split('.')[0] + '.' + ethersFormattedAmount.split('.')[1].slice(0, 4) : ethersFormattedAmount;
+    } catch (error) {
+      console.error('Error formatting token amount:', error);
+      return '0';
+    }
+  };
 
   const handleInputChange = (e, formSetter) => {
     const { name, value } = e.target;
@@ -188,7 +250,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
       await updateEstateOwner(verifyEstateOwnerForm.estateOwnerAddress, {
         isVerified: true,
         realEstateId: verifyEstateOwnerForm.realEstateId,
-        realEstateValue: verifyEstateOwnerForm.realEstateValue,
+        currentEstateCost: verifyEstateOwnerForm.realEstateValue.toString(), // Ensure it's a string
         tokenizationPercentage: verifyEstateOwnerForm.tokenizationPercentage
       });
       
@@ -203,8 +265,8 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
       });
       
       // Refresh estate owners list
-      const data = await getEstateOwnersByNodeOperator(nodeOperatorEns);
-      setEstateOwners(data.estateOwners || []);
+      const estateOwners = await getEstateOwnersByNodeOperator(nodeOperatorEns);
+      setEstateOwners(estateOwners || []);
     } catch (error) {
       setError(`Error: ${error.message}`);
     } finally {
@@ -221,7 +283,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
     setVerifyEstateOwnerForm({
       estateOwnerAddress: estateOwner.ethAddress,
       realEstateId: ethers.utils.id(estateOwner.realEstateInfo),
-      realEstateValue: estateOwner.currentEstateCost,
+      realEstateValue: estateOwner.currentEstateCost.toString(), // Ensure it's a string
       tokenizationPercentage: estateOwner.percentageToTokenize
     });
     
@@ -349,19 +411,29 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                 <tbody>
                   <tr>
                     <th>ENS Name</th>
-                    <td>{nodeOperatorEns}</td>
+                    <td>{nodeOperatorInfo.ensName}</td>
                   </tr>
                   <tr>
                     <th>Vault Address</th>
-                    <td>{nodeOperatorInfo.vaultAddress}</td>
+                    <td>{nodeOperatorInfo.vault}</td>
                   </tr>
                   <tr>
                     <th>Collateral Token</th>
-                    <td>{nodeOperatorInfo.collateralToken}</td>
+                    <td>
+                      {nodeOperatorInfo.token === ethers.constants.AddressZero ? 
+                        `Native ${tokenSymbol}` : 
+                        `${tokenSymbol} (${nodeOperatorInfo.token})`
+                      }
+                    </td>
                   </tr>
                   <tr>
                     <th>Collateral Amount</th>
-                    <td>{ethers.utils.formatEther(nodeOperatorInfo.collateralAmount)} {nodeOperatorInfo.collateralToken === ethers.constants.AddressZero ? 'ETH/AVAX' : 'Tokens'}</td>
+                    <td>
+                      {nodeOperatorInfo.stakedCollateralInToken ? 
+                        `${formatTokenAmount(nodeOperatorInfo.stakedCollateralInToken)} ${tokenSymbol}` 
+                        : 'Loading...'
+                      }
+                    </td>
                   </tr>
                   <tr>
                     <th>Status</th>
@@ -399,9 +471,9 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                           <td>{owner.name}</td>
                           <td>{owner.ethAddress}</td>
                           <td>{owner.country}</td>
-                          <td>${owner.currentEstateCost}</td>
+                          <td>{formatTokenAmount(owner.currentEstateCost)} {tokenSymbol}</td>
                           <td>{owner.percentageToTokenize}%</td>
-                          <td>{owner.isVerified ? 'Verified' : 'Pending'}</td>
+                          <td>{owner.isVerified ? 'Verified' : (owner.isRejected ? 'Rejected' : 'Pending')}</td>
                           <td>
                             <Button 
                               variant="info" 
@@ -468,15 +540,23 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                     </Form.Group>
                     
                     <Form.Group className="mb-3">
-                      <Form.Label>Real Estate Value (USD)</Form.Label>
+                      <Form.Label>Estate Value</Form.Label>
                       <Form.Control
-                        type="number"
+                        type="text"
                         name="realEstateValue"
                         value={verifyEstateOwnerForm.realEstateValue}
-                        onChange={(e) => handleInputChange(e, setVerifyEstateOwnerForm)}
-                        min="1"
+                        onChange={(e) => {
+                          // Only allow numbers and decimal point
+                          if (/^\d*\.?\d*$/.test(e.target.value)) {
+                            handleInputChange(e, setVerifyEstateOwnerForm);
+                          }
+                        }}
+                        placeholder="Enter estate value"
                         required
                       />
+                      <Form.Text className="text-muted">
+                        Value in {tokenSymbol}
+                      </Form.Text>
                     </Form.Group>
                     
                     <Form.Group className="mb-3">
@@ -550,7 +630,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                   </tr>
                   <tr>
                     <th>Estate Value</th>
-                    <td>${selectedEstateOwner.currentEstateCost}</td>
+                    <td>{formatTokenAmount(selectedEstateOwner.currentEstateCost)} {tokenSymbol}</td>
                   </tr>
                   <tr>
                     <th>Tokenization Percentage</th>
