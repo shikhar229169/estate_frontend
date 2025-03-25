@@ -336,12 +336,23 @@ export const getAllNodeOperators = async () => {
   }
 };
 
-export const registerNodeOperatorWithBlockchain = async (signupData) => {
+export const registerNodeOperatorWithBlockchain = async (data) => {
   try {
-    const response = await api.post('/node/blockchain-signup', signupData);
+    const response = await api.post('/node/blockchain-signup', {
+      name: data.name,
+      email: data.email,
+      password: data.password,
+      autoUpdateEnabled: data.autoUpdateEnabled,
+      ensName: data.ensName,
+      ethAddress: data.ethAddress,
+      paymentToken: data.paymentToken,
+      signature: data.signature,
+      vaultAddress: data.vaultAddress,
+      isApproved: false
+    });
     return response.data;
   } catch (error) {
-    console.error('Node operator blockchain registration error:', error);
+    console.error('Error registering node operator:', error);
     throw error;
   }
 };
@@ -399,20 +410,18 @@ export const getEstateOwnerByAddress = async (ethAddress) => {
 
 export const getEstateOwnersByNodeOperator = async (nodeOperatorEns) => {
   try {
-    const response = await api.get(`/node/users`);
+    const response = await api.get(`/node/filtered-users?nodeOperatorAssigned=${nodeOperatorEns}`);
     const estateOwners = response.data.data.users;
-    return estateOwners.filter((estateOwner) => {
-      return estateOwner.nodeOperatorAssigned === nodeOperatorEns;
-    });
+    return estateOwners;
   } catch (error) {
     console.error('Failed to get estate owners by node operator:', error);
     throw error;
   }
 };
 
-export const updateEstateOwner = async (userId, userData) => {
+export const updateEstateOwner = async (userId) => {
   try {
-    const response = await api.patch(`/user/${userId}`, userData);
+    const response = await api.patch(`/node/users/${userId}/verify`)
     return response.data;
   } catch (error) {
     console.error('Estate owner update error:', error);

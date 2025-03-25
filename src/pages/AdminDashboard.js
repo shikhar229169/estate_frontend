@@ -240,7 +240,7 @@ const AdminDashboard = ({ walletAddress, chainId }) => {
         }
       }
     } catch (error) {
-      setError(`Error: ${error.message}`);
+      setError(`Error: Invalid ENS Name`);
     } finally {
       setLoading(false);
     }

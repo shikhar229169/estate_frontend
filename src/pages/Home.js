@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Card, Button, Row, Col, Form, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
+import { ethers } from 'ethers';
 import { adminLogin, nodeOperatorLogin, registerEstateOwner } from '../utils/api';
-import { switchNetwork } from '../utils/interact';
+import { switchNetwork, getContracts } from '../utils/interact';
 
 const Home = ({ walletAddress, connectWalletPressed, setRole, role }) => {
   const navigate = useNavigate();
@@ -44,12 +45,48 @@ const Home = ({ walletAddress, connectWalletPressed, setRole, role }) => {
     setFile(e.target.files[0]);
   };
 
-  const handleRoleSelect = (selectedRole) => {
+  const handleRoleSelect = async (selectedRole) => {
     if (!walletAddress) {
       setError('Please connect your wallet first');
       return;
     }
-    
+
+    if (selectedRole === 'estate-owner') {
+      try {
+        setLoading(true);
+        
+        // Get current chain ID
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const network = await provider.getNetwork();
+        const chainId = network.chainId;
+        
+        const contracts = getContracts(chainId);
+        if (!contracts || !contracts.assetTokenizationManager) {
+          setError('Contracts not loaded. Please check your network connection.');
+          return;
+        }
+
+        // Check if address is already an estate owner
+        const tokenizedRealEstate = await contracts.assetTokenizationManager.getEstateOwnerToTokeinzedRealEstate(walletAddress);
+        console.log(tokenizedRealEstate)
+        if (tokenizedRealEstate && tokenizedRealEstate !== "0x0000000000000000000000000000000000000000") {
+          // Already an estate owner, redirect to dashboard
+          setRole('estate-owner');
+          localStorage.setItem('userRole', 'estate-owner');
+          navigate('/dashboard/estate-owner');
+        } else {
+          // Not an estate owner, show registration form
+          setActiveForm('estate-owner');
+        }
+      } catch (error) {
+        console.error('Error checking estate owner status:', error);
+        setError('Error checking estate owner status. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     setActiveForm(selectedRole);
     setError('');
     setSuccess('');
@@ -503,8 +540,9 @@ const Home = ({ walletAddress, connectWalletPressed, setRole, role }) => {
                   variant="primary" 
                   className="mt-auto"
                   onClick={() => handleRoleSelect('estate-owner')}
+                  disabled={loading}
                 >
-                  Register as Estate Owner
+                  {loading ? 'Checking...' : 'Open Real Estate'}
                 </Button>
               </Card.Body>
             </Card>

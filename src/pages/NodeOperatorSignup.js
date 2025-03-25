@@ -3,6 +3,8 @@ import { Container, Form, Button, Card, Alert, Spinner } from 'react-bootstrap';
 import { ethers } from 'ethers';
 import { getContracts, getCurrentWalletConnected } from '../utils/interact';
 import { checkNodeOperatorExists, registerNodeOperatorWithBlockchain } from '../utils/api';
+import { useNavigate } from 'react-router-dom';
+import addresses from '../contracts/abi/addresses';
 
 const NodeOperatorSignup = ({ setRole }) => {
   const [walletAddress, setWalletAddress] = useState('');
@@ -12,22 +14,22 @@ const NodeOperatorSignup = ({ setRole }) => {
   const [success, setSuccess] = useState('');
   const [chainId, setChainId] = useState(null);
   const [contracts, setContracts] = useState(null);
+  const [tokenOptions, setTokenOptions] = useState([]);
   
   // Form state
   const [ensName, setEnsName] = useState('');
   const [paymentToken, setPaymentToken] = useState('');
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(false);
-  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [signature, setSignature] = useState('');
+  const navigate = useNavigate();
   
   useEffect(() => {
     const init = async () => {
       try {
-        setLoading(true);
-        
         // Get connected wallet
         const { address, status } = await getCurrentWalletConnected();
         console.log("Wallet connection status:", status, "Address:", address);
@@ -46,6 +48,9 @@ const NodeOperatorSignup = ({ setRole }) => {
           const provider = new ethers.providers.Web3Provider(window.ethereum);
           const network = await provider.getNetwork();
           setChainId(network.chainId);
+          
+          // Update token options based on chain
+          updateTokenOptions(network.chainId);
           
           // Get contract instances
           const contractInstances = getContracts(network.chainId);
@@ -75,35 +80,35 @@ const NodeOperatorSignup = ({ setRole }) => {
                       localStorage.setItem('userRole', 'node-operator');
                     }
                     
-                    // Redirect to dashboard after a short delay
-                    setTimeout(() => {
-                      window.location.href = '/dashboard/node-operator';
-                    }, 2000);
-                  } else {
-                    // User is registered in blockchain but not in backend
-                    // We'll let them complete the signup form
-                    setEnsName(operatorInfo.ensName || '');
-                    setPaymentToken(operatorInfo.paymentToken || 'ETH');
-                    setAutoUpdateEnabled(operatorInfo.autoUpdateEnabled || false);
-                    console.log('Node operator is registered in blockchain but not in backend');
+                    // Redirect to dashboard
+                    navigate('/node-operator-dashboard');
                   }
                 } catch (error) {
                   console.error('Error checking backend registration:', error);
                 }
-              } else {
-                setIsRegistered(false);
               }
             } catch (error) {
               console.error('Error checking blockchain registration:', error);
-              setError('Error checking blockchain registration: ' + error.message);
             }
           }
         }
-      } catch (error) {
-        console.error('Error initializing:', error);
-        setError('Error initializing: ' + error.message);
+      } catch (err) {
+        console.error(err);
+        setError('Error connecting to wallet');
       } finally {
         setLoading(false);
+      }
+    };
+    
+    const updateTokenOptions = (chainId) => {
+      const networkAddresses = addresses[chainId];
+      if (networkAddresses) {
+        setTokenOptions([
+          { name: `Native ${chainId === 43114 ? 'AVAX' : 'ETH'}`, address: ethers.constants.AddressZero },
+          { name: 'USDC', address: networkAddresses.usdc }
+        ]);
+        // Reset payment token when chain changes
+        setPaymentToken('');
       }
     };
     
@@ -120,8 +125,10 @@ const NodeOperatorSignup = ({ setRole }) => {
         }
       });
       
-      window.ethereum.on('chainChanged', () => {
-        window.location.reload();
+      window.ethereum.on('chainChanged', (chainId) => {
+        const newChainId = parseInt(chainId, 16);
+        setChainId(newChainId);
+        updateTokenOptions(newChainId);
       });
     }
     
@@ -131,7 +138,7 @@ const NodeOperatorSignup = ({ setRole }) => {
         window.ethereum.removeListener('chainChanged', () => {});
       }
     };
-  }, [setRole]);
+  }, [setRole, navigate]);
   
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -148,45 +155,93 @@ const NodeOperatorSignup = ({ setRole }) => {
         return;
       }
       
-      if (!ensName || !paymentToken || !username || !password || !name || !email) {
+      if (!ensName || !paymentToken || !password || !name || !email || !signature) {
         setError('Please fill in all required fields');
         setLoading(false);
         return;
       }
       
-      // Generate a signature (this is a placeholder - in a real app, you'd sign a message)
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const signer = provider.getSigner();
-      const signature = await signer.signMessage(`I am registering as a node operator with ENS name: ${ensName}`);
+      try {
+        // First, deposit collateral and register vault
+        const contracts = getContracts(chainId);
+        if (!contracts || !contracts.realEstateRegistry) {
+          setError('Contracts not loaded');
+          setLoading(false);
+          return;
+        }
+        
+        
+        // If using non-native token (not AddressZero), get approval first
+        if (paymentToken !== ethers.constants.AddressZero) {
+          const tokenContract = new ethers.Contract(
+            paymentToken,
+            [
+              "function approve(address spender, uint256 amount) public returns (bool)",
+              "function allowance(address owner, address spender) public view returns (uint256)"
+            ],
+            contracts.signer
+          );
+
+          // Check current allowance
+          const currentAllowance = await tokenContract.allowance(walletAddress, contracts.realEstateRegistry.address);
+          if (currentAllowance.eq(0)) {
+            // Request max approval
+            const maxAmount = ethers.constants.MaxUint256;
+            console.log("Requesting token approval...");
+            const approveTx = await tokenContract.approve(contracts.realEstateRegistry.address, maxAmount);
+            await approveTx.wait();
+            console.log("Token approved");
+          }
+        }
+
+
+        // Register vault and deposit collateral
+        const tx = await contracts.realEstateRegistry.depositCollateralAndRegisterVault(
+          ensName,
+          paymentToken,
+          signature,
+          autoUpdateEnabled
+        );
+        await tx.wait();
+
+        // Get the vault address
+        const vaultAddress = await contracts.realEstateRegistry.getOperatorVault(walletAddress);
+        
+        // Register in the backend
+        const signupData = {
+          name,
+          email,
+          password,
+          ethAddress: walletAddress,
+          ensName,
+          paymentToken,
+          autoUpdateEnabled,
+          signature,
+          vaultAddress,
+          isApproved: false
+        };
       
-      // Register in the backend
-      const signupData = {
-        name,
-        email,
-        password,
-        ethAddress: walletAddress,
-        ensName,
-        paymentToken,
-        autoUpdateEnabled,
-        signature
-      };
-      
-      const response = await registerNodeOperatorWithBlockchain(signupData);
-      
-      // Set success message
-      setSuccess('Successfully registered as a node operator! Redirecting to dashboard...');
-      
-      // Set role if provided
-      if (setRole) {
-        setRole('node-operator');
-        localStorage.setItem('userRole', 'node-operator');
-        localStorage.setItem('token', response.token);
+        const response = await registerNodeOperatorWithBlockchain(signupData);
+        
+        // Set success message
+        setSuccess('Successfully registered as a node operator! Redirecting to dashboard...');
+        
+        // Set role if provided
+        if (setRole) {
+          setRole('node-operator');
+          localStorage.setItem('userRole', 'node-operator');
+          localStorage.setItem('token', response.token);
+        }
+        
+        // Redirect to dashboard after 2 seconds
+        setTimeout(() => {
+          navigate('/node-operator-dashboard');
+        }, 2000);
+      } catch (error) {
+        console.error('Error registering node operator:', error);
+        setError(error.message || 'Failed to register node operator');
+        setLoading(false);
       }
-      
-      // Redirect to dashboard after a short delay
-      setTimeout(() => {
-        window.location.href = '/dashboard/node-operator';
-      }, 2000);
     } catch (error) {
       console.error('Error registering:', error);
       setError('Error registering: ' + (error.message || 'Unknown error'));
@@ -329,18 +384,20 @@ const NodeOperatorSignup = ({ setRole }) => {
             
             <Form.Group className="mb-3">
               <Form.Label>Payment Token *</Form.Label>
-              <Form.Control
-                as="select"
+              <Form.Select
                 value={paymentToken}
                 onChange={(e) => setPaymentToken(e.target.value)}
                 required
               >
-                <option value="ETH">ETH</option>
-                <option value="USDC">USDC</option>
-                <option value="DAI">DAI</option>
-              </Form.Control>
+                <option value="">Select a token</option>
+                {tokenOptions.map((token, index) => (
+                  <option key={index} value={token.address}>
+                    {token.name}
+                  </option>
+                ))}
+              </Form.Select>
               <Form.Text className="text-muted">
-                Token you want to receive payments in
+                Select the token you want to use for payments
               </Form.Text>
             </Form.Group>
             
@@ -355,18 +412,7 @@ const NodeOperatorSignup = ({ setRole }) => {
                 Allow the system to automatically update your node
               </Form.Text>
             </Form.Group>
-            
-            <Form.Group className="mb-3">
-              <Form.Label>Username *</Form.Label>
-              <Form.Control
-                type="text"
-                placeholder="Choose a username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-              />
-            </Form.Group>
-            
+
             <Form.Group className="mb-3">
               <Form.Label>Password *</Form.Label>
               <Form.Control
@@ -391,6 +437,17 @@ const NodeOperatorSignup = ({ setRole }) => {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 minLength={8}
+              />
+            </Form.Group>
+            
+            <Form.Group className="mb-4">
+              <Form.Label>Signature *</Form.Label>
+              <Form.Control
+                type="text"
+                placeholder="Enter your signature"
+                value={signature}
+                onChange={(e) => setSignature(e.target.value)}
+                required
               />
             </Form.Group>
             

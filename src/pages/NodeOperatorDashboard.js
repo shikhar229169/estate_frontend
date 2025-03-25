@@ -25,10 +25,11 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
   });
   
   const [verifyEstateOwnerForm, setVerifyEstateOwnerForm] = useState({
+    estateOwnerId: '',
     estateOwnerAddress: '',
-    realEstateId: '',
     realEstateValue: '',
-    tokenizationPercentage: ''
+    tokenizationPercentage: '',
+    token: ''
   });
   
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -225,10 +226,22 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
     }
   };
 
+  const handleVerifyFromList = (estateOwner) => {
+    setVerifyEstateOwnerForm({
+      estateOwnerId: estateOwner._id,
+      estateOwnerAddress: estateOwner.ethAddress,
+      realEstateValue: estateOwner.currentEstateCost.toString(),
+      tokenizationPercentage: estateOwner.percentageToTokenize,
+      token: estateOwner.token || ethers.constants.AddressZero
+    });
+    
+    setActiveTab('verifyEstateOwner');
+  };
+
   const handleVerifyEstateOwner = async (e) => {
-    e.preventDefault();
-    if (!contracts || !contracts.realEstateRegistry) {
-      setError('Contracts not loaded');
+    e.preventDefault();    
+    if (!contracts || !contracts.estateVerification) {
+      setError('Estate Verification contract not loaded');
       return;
     }
     
@@ -236,32 +249,44 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
     setError('');
     setSuccess('');
     
-    try {
-      const tx = await contracts.realEstateRegistry.verifyEstateOwner(
-        verifyEstateOwnerForm.estateOwnerAddress,
-        verifyEstateOwnerForm.realEstateId,
-        ethers.utils.parseEther(verifyEstateOwnerForm.realEstateValue),
-        verifyEstateOwnerForm.tokenizationPercentage
+    try {      
+      const _request = {
+        estateOwner: verifyEstateOwnerForm.estateOwnerAddress,
+        chainsToDeploy: [43113, 11155111],
+        paymentToken: verifyEstateOwnerForm.token,
+        estateOwnerAcrossChain: [verifyEstateOwnerForm.estateOwnerAddress, verifyEstateOwnerForm.estateOwnerAddress]
+      };
+
+      const _response = ethers.utils.defaultAbiCoder.encode(
+        ['uint256', 'uint256', 'bool', 'bytes', 'address'],
+        [
+          verifyEstateOwnerForm.realEstateValue,
+          ethers.utils.parseEther(verifyEstateOwnerForm.tokenizationPercentage.toString()),
+          true,
+          ethers.utils.toUtf8Bytes(verifyEstateOwnerForm.estateOwnerId),
+          walletAddress
+        ]
+      );
+
+      const tx = await contracts.estateVerification.createTestRequestIdResponse(
+        _request,
+        _response
       );
       
       await tx.wait();
       
-      // Update estate owner status in backend
-      await updateEstateOwner(verifyEstateOwnerForm.estateOwnerAddress, {
-        isVerified: true,
-        realEstateId: verifyEstateOwnerForm.realEstateId,
-        currentEstateCost: verifyEstateOwnerForm.realEstateValue.toString(), // Ensure it's a string
-        tokenizationPercentage: verifyEstateOwnerForm.tokenizationPercentage
-      });
+      // Update estate owner status in backend using _id
+      await updateEstateOwner(verifyEstateOwnerForm.estateOwnerId);
       
       setSuccess('Estate owner verified successfully!');
       
       // Reset form
       setVerifyEstateOwnerForm({
+        estateOwnerId: '',
         estateOwnerAddress: '',
-        realEstateId: '',
         realEstateValue: '',
-        tokenizationPercentage: ''
+        tokenizationPercentage: '',
+        token: ''
       });
       
       // Refresh estate owners list
@@ -277,17 +302,6 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
   const handleViewDetails = (estateOwner) => {
     setSelectedEstateOwner(estateOwner);
     setShowDetailsModal(true);
-  };
-
-  const handleVerifyFromList = (estateOwner) => {
-    setVerifyEstateOwnerForm({
-      estateOwnerAddress: estateOwner.ethAddress,
-      realEstateId: ethers.utils.id(estateOwner.realEstateInfo),
-      realEstateValue: estateOwner.currentEstateCost.toString(), // Ensure it's a string
-      tokenizationPercentage: estateOwner.percentageToTokenize
-    });
-    
-    setActiveTab('verifyEstateOwner');
   };
 
   if (!walletAddress) {
@@ -511,7 +525,11 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
               <Card>
                 <Card.Body>
                   <h4>Verify Estate Owner</h4>
-                  <Form onSubmit={handleVerifyEstateOwner}>
+                  <Form 
+                    onSubmit={(e) => {
+                      handleVerifyEstateOwner(e);
+                    }}
+                  >
                     <Form.Group className="mb-3">
                       <Form.Label>Estate Owner Address</Form.Label>
                       <Form.Control
@@ -522,21 +540,6 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                         placeholder="0x..."
                         required
                       />
-                    </Form.Group>
-                    
-                    <Form.Group className="mb-3">
-                      <Form.Label>Real Estate ID</Form.Label>
-                      <Form.Control
-                        type="text"
-                        name="realEstateId"
-                        value={verifyEstateOwnerForm.realEstateId}
-                        onChange={(e) => handleInputChange(e, setVerifyEstateOwnerForm)}
-                        placeholder="0x..."
-                        required
-                      />
-                      <Form.Text className="text-muted">
-                        This should be a unique identifier for the real estate (e.g., hash of property details)
-                      </Form.Text>
                     </Form.Group>
                     
                     <Form.Group className="mb-3">
@@ -568,6 +571,18 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                         onChange={(e) => handleInputChange(e, setVerifyEstateOwnerForm)}
                         min="1"
                         max="100"
+                        required
+                      />
+                    </Form.Group>
+                    
+                    <Form.Group className="mb-3">
+                      <Form.Label>Token</Form.Label>
+                      <Form.Control
+                        type="text"
+                        name="token"
+                        value={verifyEstateOwnerForm.token}
+                        onChange={(e) => handleInputChange(e, setVerifyEstateOwnerForm)}
+                        placeholder="0x..."
                         required
                       />
                     </Form.Group>
