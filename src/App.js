@@ -13,6 +13,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import NodeOperatorDashboard from './pages/NodeOperatorDashboard';
 import NodeOperatorSignup from './pages/NodeOperatorSignup';
 import EstateOwnerDashboard from './pages/EstateOwnerDashboard';
+import EstateOwnerSignup from './pages/EstateOwnerSignup';
 import UserDashboard from './pages/UserDashboard';
 
 // Utils
@@ -136,6 +137,16 @@ function App() {
               path="/node-operator-signup" 
               element={
                 <NodeOperatorSignup 
+                  walletAddress={walletAddress}
+                  chainId={chainId}
+                  setRole={setRole}
+                />
+              } 
+            />
+            <Route 
+              path="/estate-owner-signup" 
+              element={
+                <EstateOwnerSignup 
                   walletAddress={walletAddress}
                   chainId={chainId}
                   setRole={setRole}

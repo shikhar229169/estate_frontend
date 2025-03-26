@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Tab, Tabs, Card, Form, Button, Table, Alert, Spinner, Modal } from 'react-bootstrap';
 import { ethers } from 'ethers';
 import { getContracts, switchNetwork } from '../utils/interact';
-import { getEstateOwnersByNodeOperator, updateEstateOwner, getNodeOperatorByWalletAddress } from '../utils/api';
+import { getEstateOwnersByNodeOperator, updateEstateOwner, getNodeOperatorByWalletAddress, updateNodeOperatorAutoUpdate } from '../utils/api';
+import VerifyingOperatorVaultABI from '../contracts/abi/VerifyingOperatorVault';
 
 const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
   const [activeTab, setActiveTab] = useState('verifyEstateOwners');
@@ -16,6 +17,8 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
   const [isRegistered, setIsRegistered] = useState(false);
   const [tokenDecimals, setTokenDecimals] = useState(18); // Default to 18 for native token
   const [tokenSymbol, setTokenSymbol] = useState(''); // For storing the token symbol
+  const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(false); // New state for auto update
+  const [nodeOperatorId, setNodeOperatorId] = useState(null); // Add state for node operator ID
   
   // Form states for various node operator functions
   const [registerVaultForm, setRegisterVaultForm] = useState({
@@ -48,12 +51,16 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
           // Try to get node operator info
           try {
             const nodeInfo = await contractInstances.realEstateRegistry.getOperatorInfo(walletAddress);
-            
+            const operatorVaultAddress = await contractInstances.realEstateRegistry.getOperatorVault(walletAddress);
+            const operatorVault = new ethers.Contract(operatorVaultAddress, VerifyingOperatorVaultABI, contractInstances.signer);
+            const aue = await operatorVault.isAutoUpdateEnabled()
+
             // If vault address is not zero, operator is registered
             if (nodeInfo && nodeInfo.vaultAddress !== ethers.constants.AddressZero) {
               setIsRegistered(true);
               setNodeOperatorInfo(nodeInfo);
-              setNodeOperatorEns(nodeInfo.ensName)
+              setNodeOperatorEns(nodeInfo.ensName);
+              setAutoUpdateEnabled(aue); // Set auto update status
               console.log('Node operator info:', nodeInfo);
               
               // Also fetch info from backend
@@ -61,10 +68,11 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                 const backendInfo = await getNodeOperatorByWalletAddress(walletAddress);
                 if (backendInfo && backendInfo.data) {
                   // Merge blockchain and backend info
-                  setNodeOperatorInfo({
-                    ...nodeInfo,
-                    ...backendInfo.data
-                  });
+                  // setNodeOperatorInfo({
+                  //   ...nodeInfo,
+                  //   ...backendInfo.data
+                  // });
+                  setNodeOperatorId(backendInfo.data.id); // Store the node operator ID
                 }
               } catch (error) {
                 console.error('Error fetching backend operator info:', error);
@@ -227,6 +235,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
   };
 
   const handleVerifyFromList = (estateOwner) => {
+    console.log("Verity eo:", estateOwner)
     setVerifyEstateOwnerForm({
       estateOwnerId: estateOwner._id,
       estateOwnerAddress: estateOwner.ethAddress,
@@ -302,6 +311,59 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
   const handleViewDetails = (estateOwner) => {
     setSelectedEstateOwner(estateOwner);
     setShowDetailsModal(true);
+  };
+
+  const handleToggleAutoUpdate = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      // Get the operator vault address
+      const operatorVaultAddress = await contracts.realEstateRegistry.getOperatorVault(walletAddress);
+      const operatorVault = new ethers.Contract(operatorVaultAddress, VerifyingOperatorVaultABI, contracts.signer);
+      
+      // Toggle auto update on the vault
+      const tx = await operatorVault.toggleAutoUpdate();
+      await tx.wait();
+      
+      // Update local state
+      const newAutoUpdateStatus = !autoUpdateEnabled;
+      setAutoUpdateEnabled(newAutoUpdateStatus);
+      
+      // Update backend state
+      await updateNodeOperatorAutoUpdate(nodeOperatorId, newAutoUpdateStatus);
+      
+      setSuccess('Auto update setting has been toggled successfully');
+    } catch (error) {
+      console.error('Error toggling auto update:', error);
+      setError('Failed to toggle auto update: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForceUpgrade = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      const operatorVaultImplementation = await contracts.realEstateRegistry.getOperatorVaultImplementation();
+      const operatorVaultAddress = await contracts.realEstateRegistry.getOperatorVault(walletAddress);
+      const operatorVault = new ethers.Contract(operatorVaultAddress, VerifyingOperatorVaultABI, contracts.signer);
+      await operatorVault.upgradeToAndCall(operatorVaultImplementation, []);
+      
+      setSuccess('Vault has been force upgraded successfully');
+    } catch (error) {
+
+      if (error.error.data.data === "0x3e924efb") {
+        setSuccess('Vault is already up to date');
+      }
+      else {
+        console.error('Error force upgrading vault:', error);
+        setError('Failed to force upgrade vault: ' + error.message);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!walletAddress) {
@@ -452,6 +514,32 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                   <tr>
                     <th>Status</th>
                     <td>{nodeOperatorInfo.isApproved ? 'Approved' : 'Pending Approval'}</td>
+                  </tr>
+                  <tr>
+                    <th>Auto Update</th>
+                    <td>
+                      {autoUpdateEnabled ? 'Enabled' : 'Disabled'}
+                      <Button
+                        variant={autoUpdateEnabled ? "warning" : "success"}
+                        size="sm"
+                        className="ms-2"
+                        onClick={handleToggleAutoUpdate}
+                        disabled={loading}
+                      >
+                        {autoUpdateEnabled ? 'Disable' : 'Enable'} Auto Update
+                      </Button>
+                      {!autoUpdateEnabled && (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          className="ms-2"
+                          onClick={handleForceUpgrade}
+                          disabled={loading}
+                        >
+                          Force Upgrade
+                        </Button>
+                      )}
+                    </td>
                   </tr>
                 </tbody>
               </Table>

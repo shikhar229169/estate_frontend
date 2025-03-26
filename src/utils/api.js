@@ -318,10 +318,20 @@ export const registerNodeOperator = async (nodeData) => {
 
 export const updateNodeOperator = async (nodeId, nodeData) => {
   try {
-    const response = await api.patch(`/admin/nodes/${nodeId}`, nodeData);
+    const response = await api.put(`/node-operators/${nodeId}`, nodeData);
     return response.data;
   } catch (error) {
-    console.error('Node operator update error:', error);
+    console.error('Update node operator error:', error);
+    throw error;
+  }
+};
+
+export const updateNodeOperatorAutoUpdate = async (nodeId, autoUpdateEnabled) => {
+  try {
+    const response = await api.patch(`/node/update-node/${nodeId}`, { autoUpdateEnabled });
+    return response.data;
+  } catch (error) {
+    console.error('Update auto update status error:', error);
     throw error;
   }
 };
@@ -369,10 +379,20 @@ export const checkNodeOperatorExists = async (walletAddress) => {
 
 export const getNodeOperatorByWalletAddress = async (walletAddress) => {
   try {
-    const response = await api.get(`/node/check/${walletAddress}`);
+    const response = await api.get(`/node/check/${ethers.utils.getAddress(walletAddress)}`);
     return response.data;
   } catch (error) {
     console.error('Failed to get node operator by wallet address:', error);
+    throw error;
+  }
+};
+
+export const getApprovedNodeOperators = async () => {
+  try {
+    const response = await api.get('/node/get-approved-nodes', { headers: { 'x-api-key': 123 } });
+    return response.data;
+  } catch (error) {
+    console.error('Failed to get approved node operators:', error);
     throw error;
   }
 };
@@ -400,7 +420,7 @@ export const getAllEstateOwners = async () => {
 
 export const getEstateOwnerByAddress = async (ethAddress) => {
   try {
-    const response = await api.get(`/user/address/${ethAddress}`);
+    const response = await api.get(`/user/eth/${ethAddress}`, { headers: { 'x-api-key': 123 } });
     return response.data;
   } catch (error) {
     console.error('Failed to get estate owner by address:', error);

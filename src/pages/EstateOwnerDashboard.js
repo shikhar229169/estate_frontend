@@ -3,6 +3,7 @@ import { Card, Button, Table, Alert, Spinner, Form, Tab, Tabs, Modal } from 'rea
 import { ethers } from 'ethers';
 import { getContracts, switchNetwork } from '../utils/interact';
 import { getEstateOwnerByAddress } from '../utils/api';
+import TokenizedRealEstateABI from '../contracts/abi/TokenizedRealEstate';
 
 const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
   const [activeTab, setActiveTab] = useState('estateDetails');
@@ -13,7 +14,11 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
   const [estateOwner, setEstateOwner] = useState(null);
   const [tokenizationDetails, setTokenizationDetails] = useState(null);
   const [showTokenizeModal, setShowTokenizeModal] = useState(false);
-  
+  const [tokenSymbol, setTokenSymbol] = useState('');
+  const [tokenContractAddr, setTokenContractAddr] = useState('');
+  const [tokenDecimals, setTokenDecimals] = useState(18);
+  const [formattedEstateCost, setFormattedEstateCost] = useState('');
+
   // Form states for tokenization
   const [tokenizeForm, setTokenizeForm] = useState({
     tokenName: '',
@@ -32,10 +37,46 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
           
           // Try to get tokenization details if estate is already tokenized
           try {
-            const estateId = await contractInstances.realEstateRegistry.getEstateIdByOwner(walletAddress);
-            if (estateId && estateId !== ethers.constants.HashZero) {
-              const details = await contractInstances.realEstateRegistry.getEstateDetails(estateId);
-              setTokenizationDetails(details);
+            // Use the correct function from assetTokenizationManager instead of realEstateRegistry
+            const tokenizedRealEstate = await contractInstances.assetTokenizationManager.getEstateOwnerToTokeinzedRealEstate(walletAddress);
+            
+            if (tokenizedRealEstate && tokenizedRealEstate !== ethers.constants.AddressZero) {
+              // Get details from the tokenized real estate contract if available
+              try {
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                
+                // Create contract instance for the tokenized real estate
+                const tokenContract = new ethers.Contract(
+                  tokenizedRealEstate,
+                  TokenizedRealEstateABI,
+                  provider
+                );
+                
+                // Get token details
+                const tokenName = await tokenContract.name();
+                const tokenSymbol = await tokenContract.symbol();
+                const tokenSupply = await tokenContract.totalSupply();
+                const tokenPrice = await tokenContract.getPerEstateTokenPrice();
+                const decimals = await tokenContract.decimals();
+                
+                console.log("<MEEEEOW:", tokenSupply);
+
+                setTokenizationDetails({
+                  tokenAddress: tokenizedRealEstate,
+                  tokenName: tokenName,
+                  tokenSymbol: tokenSymbol,
+                  tokenSupply: tokenSupply,
+                  tokenPrice: tokenPrice,
+                  isTokenized: true,
+                  decimals: decimals
+                });
+              } catch (error) {
+                console.error('Error fetching token details:', error);
+                setTokenizationDetails({
+                  tokenAddress: tokenizedRealEstate,
+                  isTokenized: true
+                });
+              }
             }
           } catch (error) {
             console.error('Error loading tokenization details:', error);
@@ -51,7 +92,58 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
         try {
           setLoading(true);
           const data = await getEstateOwnerByAddress(walletAddress);
-          setEstateOwner(data.estateOwner);
+          const estateOwner = data.data.user;
+          setEstateOwner(estateOwner);
+          
+          // Get token information if available
+          if (estateOwner && estateOwner.token) {
+            try {
+              const provider = new ethers.providers.Web3Provider(window.ethereum);
+              
+              // Check if token is native token (address 0)
+              if (estateOwner.token === ethers.constants.AddressZero) {
+                setTokenSymbol(chainId === 43114 ? 'AVAX' : 'ETH');
+                setTokenContractAddr('');
+                setTokenDecimals(18);
+              } else {
+                // Get token contract
+                const tokenContract = new ethers.Contract(
+                  estateOwner.token,
+                  [
+                    "function symbol() view returns (string)",
+                    "function decimals() view returns (uint8)"
+                  ],
+                  provider
+                );
+                
+                // Get token symbol and decimals
+                const symbol = await tokenContract.symbol();
+                const decimals = await tokenContract.decimals();
+                
+                setTokenSymbol(symbol);
+                setTokenContractAddr(estateOwner.token);
+                setTokenDecimals(decimals);
+              }
+              
+              // Format estate cost based on token decimals
+              if (estateOwner.currentEstateCost) {
+                try {
+                  const formattedCost = ethers.utils.formatUnits(
+                    estateOwner.currentEstateCost,
+                    tokenDecimals
+                  );
+                  setFormattedEstateCost(formattedCost);
+                } catch (error) {
+                  console.error('Error formatting estate cost:', error);
+                  setFormattedEstateCost(estateOwner.currentEstateCost);
+                }
+              }
+            } catch (error) {
+              console.error('Error getting token details:', error);
+              setTokenSymbol('');
+              setTokenContractAddr('');
+            }
+          }
         } catch (error) {
           console.error('Error loading estate owner:', error);
         } finally {
@@ -62,7 +154,7 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
     
     loadContracts();
     loadEstateOwner();
-  }, [walletAddress, chainId]);
+  }, [walletAddress, chainId, tokenDecimals]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -108,9 +200,13 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
       setShowTokenizeModal(false);
       
       // Refresh tokenization details
-      const estateId = await contracts.realEstateRegistry.getEstateIdByOwner(walletAddress);
-      const details = await contracts.realEstateRegistry.getEstateDetails(estateId);
-      setTokenizationDetails(details);
+      const tokenizedRealEstate = await contracts.assetTokenizationManager.getEstateOwnerToTokeinzedRealEstate(walletAddress);
+      if (tokenizedRealEstate && tokenizedRealEstate !== ethers.constants.AddressZero) {
+        setTokenizationDetails({
+          tokenAddress: tokenizedRealEstate,
+          isTokenized: true
+        });
+      }
     } catch (error) {
       setError(`Error: ${error.message}`);
     } finally {
@@ -139,9 +235,13 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
       setSuccess('Funds withdrawn successfully!');
       
       // Refresh tokenization details
-      const estateId = await contracts.realEstateRegistry.getEstateIdByOwner(walletAddress);
-      const details = await contracts.realEstateRegistry.getEstateDetails(estateId);
-      setTokenizationDetails(details);
+      const tokenizedRealEstate = await contracts.assetTokenizationManager.getEstateOwnerToTokeinzedRealEstate(walletAddress);
+      if (tokenizedRealEstate && tokenizedRealEstate !== ethers.constants.AddressZero) {
+        setTokenizationDetails({
+          tokenAddress: tokenizedRealEstate,
+          isTokenized: true
+        });
+      }
     } catch (error) {
       setError(`Error: ${error.message}`);
     } finally {
@@ -254,7 +354,19 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
                   </tr>
                   <tr>
                     <th>Estate Value</th>
-                    <td>${estateOwner.currentEstateCost}</td>
+                    <td>
+                      {formattedEstateCost ? (
+                        <>
+                          {formattedEstateCost} {tokenSymbol}
+                        </>
+                      ) : (
+                        estateOwner.currentEstateCost
+                      )}
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>Payment Token</th>
+                    <td>{tokenSymbol || 'Not specified'} {`(${tokenContractAddr || ''})`}</td>
                   </tr>
                   <tr>
                     <th>Tokenization Percentage</th>
@@ -313,33 +425,49 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
                     </tr>
                     <tr>
                       <th>Token Supply</th>
-                      <td>{ethers.utils.formatEther(tokenizationDetails.tokenSupply)}</td>
+                      <td>
+                        {tokenizationDetails.tokenSupply && tokenizationDetails.decimals ? 
+                          ethers.utils.formatUnits(tokenizationDetails.tokenSupply, tokenizationDetails.decimals) : 'N/A'} {tokenizationDetails.tokenSymbol.substr(0, 3) || ''}
+                      </td>
                     </tr>
                     <tr>
                       <th>Token Price</th>
-                      <td>${ethers.utils.formatEther(tokenizationDetails.tokenPrice)}</td>
+                      <td>
+                        {tokenizationDetails.tokenPrice && tokenizationDetails.decimals ? 
+                          `$${ethers.utils.formatUnits(tokenizationDetails.tokenPrice, tokenizationDetails.decimals)}` : 'N/A'}
+                      </td>
                     </tr>
                     <tr>
                       <th>Initial Sale Percentage</th>
-                      <td>{tokenizationDetails.initialSalePercentage}%</td>
+                      <td>{tokenizationDetails.initialSalePercentage ? `${tokenizationDetails.initialSalePercentage}%` : 'N/A'}</td>
                     </tr>
                     <tr>
                       <th>Tokens Sold</th>
-                      <td>{ethers.utils.formatEther(tokenizationDetails.tokensSold)}</td>
+                      <td>
+                        {tokenizationDetails.tokensSold && tokenizationDetails.decimals ? 
+                          ethers.utils.formatUnits(tokenizationDetails.tokensSold, tokenizationDetails.decimals) : 'N/A'} {tokenizationDetails.tokenSymbol || ''}
+                      </td>
                     </tr>
                     <tr>
                       <th>Funds Raised</th>
-                      <td>${ethers.utils.formatEther(tokenizationDetails.fundsRaised)}</td>
+                      <td>
+                        {tokenizationDetails.fundsRaised && tokenizationDetails.decimals ? 
+                          `$${ethers.utils.formatUnits(tokenizationDetails.fundsRaised, tokenizationDetails.decimals)}` : 'N/A'}
+                      </td>
                     </tr>
                     <tr>
                       <th>Funds Withdrawn</th>
-                      <td>${ethers.utils.formatEther(tokenizationDetails.fundsWithdrawn)}</td>
+                      <td>
+                        {tokenizationDetails.fundsWithdrawn && tokenizationDetails.decimals ? 
+                          `$${ethers.utils.formatUnits(tokenizationDetails.fundsWithdrawn, tokenizationDetails.decimals)}` : 'N/A'}
+                      </td>
                     </tr>
                   </tbody>
                 </Table>
                 
-                {parseFloat(ethers.utils.formatEther(tokenizationDetails.fundsRaised)) > 
-                  parseFloat(ethers.utils.formatEther(tokenizationDetails.fundsWithdrawn)) && (
+                {tokenizationDetails.fundsRaised && tokenizationDetails.fundsWithdrawn && tokenizationDetails.decimals && 
+                  parseFloat(ethers.utils.formatUnits(tokenizationDetails.fundsRaised, tokenizationDetails.decimals)) > 
+                  parseFloat(ethers.utils.formatUnits(tokenizationDetails.fundsWithdrawn, tokenizationDetails.decimals)) && (
                   <Button 
                     variant="success" 
                     onClick={handleWithdrawFunds}

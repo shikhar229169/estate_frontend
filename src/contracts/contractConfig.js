@@ -1,6 +1,6 @@
 // Import ABIs from the local abi directory
 import RealEstateRegistryABI from './abi/RealEstateRegistry';
-import TokenizedRealEstateABI from './abi/TokenizedRealEstate';
+import ERC20ABI from './abi/ERC20ABI';
 import EstateVerificationABI from './abi/EstateVerification';
 import AssetTokenizationManagerABI from './abi/AssetTokenizationManager';
 import VerifyingOperatorVaultABI from './abi/VerifyingOperatorVault';
@@ -32,7 +32,7 @@ const getContractConfig = (chainId) => {
     // USDC token for payments
     USDC: {
       address: networkAddresses.usdc,
-      abi: TokenizedRealEstateABI
+      abi: ERC20ABI
     }
   };
 };

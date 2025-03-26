@@ -14,7 +14,10 @@ export const RealEstateRegistryABI = [
   // Node Operator functions
   "function registerOperatorVault(string calldata ensName) external payable",
   "function verifyEstateOwner(address estateOwner, bytes32 realEstateId, uint256 realEstateValue, uint256 tokenizationPercentage) external",
-  "function getOperatorVault(string calldata ensName) external view returns (address vaultAddress, address collateralToken, uint256 collateralAmount, bool isApproved)",
+  "function getOperatorVault(string calldata ensName) external view returns (address vaultAddress, address collateralToken, uint256 collateralAmount, bool isApproved, bool autoUpdateEnabled)",
+  "function getOperatorVaultImplementation() external view returns (address)",
+  "function toggleAutoUpdate(address implementation) external",
+  "function upgradeToAndCall(address implementation) external",
   "function getAllOperators() external view returns (string[] memory)",
   
   // Estate Owner functions

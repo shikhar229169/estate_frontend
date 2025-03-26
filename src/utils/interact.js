@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 import getContractConfig from '../contracts/contractConfig';
+import { Await } from 'react-router-dom';
 
 // Connect to wallet
 export const connectWallet = async () => {
@@ -239,6 +240,17 @@ export const approveTokens = async (tokenAddress, spenderAddress, amount, signer
     throw new Error('Failed to approve tokens: ' + error.message);
   }
 };
+
+export const getDecimalsFromTokenContract = async(tokenAddress, signer) => {
+  try {
+    const tokenContract = getERC20Contract(tokenAddress, signer);
+    const decimals = await tokenContract.decimals();
+    return decimals;
+  }
+  catch (error) {
+    throw new Error('Failed to approve tokens: ' + error.message);
+  }
+}
 
 // Get token balance
 export const getTokenBalance = async (tokenAddress, ownerAddress, signer) => {

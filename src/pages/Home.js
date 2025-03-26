@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { Card, Button, Row, Col, Form, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
-import { ethers } from 'ethers';
-import { adminLogin, nodeOperatorLogin, registerEstateOwner } from '../utils/api';
-import { switchNetwork, getContracts } from '../utils/interact';
+import { adminLogin, nodeOperatorLogin, getEstateOwnerByAddress } from '../utils/api';
+import { switchNetwork } from '../utils/interact';
 
 const Home = ({ walletAddress, connectWalletPressed, setRole, role }) => {
   const navigate = useNavigate();
@@ -13,36 +12,9 @@ const Home = ({ walletAddress, connectWalletPressed, setRole, role }) => {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // For estate owner registration
-  const [estateOwnerData, setEstateOwnerData] = useState({
-    name: '',
-    country: '',
-    state: '',
-    address: '',
-    kycType: '',
-    kycId: '',
-    realEstateInfo: '',
-    currentEstateCost: '',
-    percentageToTokenize: '',
-    signature: ''
-  });
-  
-  // For file uploads
-  const [kycDocumentImage, setKycDocumentImage] = useState(null);
-  const [ownershipDocumentImage, setOwnershipDocumentImage] = useState(null);
-
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setLoginData({ ...loginData, [name]: value });
-  };
-
-  const handleEstateOwnerInputChange = (e) => {
-    const { name, value } = e.target;
-    setEstateOwnerData({ ...estateOwnerData, [name]: value });
-  };
-
-  const handleFileChange = (e, setFile) => {
-    setFile(e.target.files[0]);
   };
 
   const handleRoleSelect = async (selectedRole) => {
@@ -55,29 +27,30 @@ const Home = ({ walletAddress, connectWalletPressed, setRole, role }) => {
       try {
         setLoading(true);
         
-        // Get current chain ID
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
-        const network = await provider.getNetwork();
-        const chainId = network.chainId;
-        
-        const contracts = getContracts(chainId);
-        if (!contracts || !contracts.assetTokenizationManager) {
-          setError('Contracts not loaded. Please check your network connection.');
-          return;
-        }
+        // Check if user is already registered as an estate owner
+        try {
+          const estateOwnerData = await getEstateOwnerByAddress(walletAddress);
+          const estateOwnerEthAddress = estateOwnerData?.data?.user?.ethAddress
 
-        // Check if address is already an estate owner
-        const tokenizedRealEstate = await contracts.assetTokenizationManager.getEstateOwnerToTokeinzedRealEstate(walletAddress);
-        console.log(tokenizedRealEstate)
-        if (tokenizedRealEstate && tokenizedRealEstate !== "0x0000000000000000000000000000000000000000") {
-          // Already an estate owner, redirect to dashboard
-          setRole('estate-owner');
-          localStorage.setItem('userRole', 'estate-owner');
-          navigate('/dashboard/estate-owner');
-        } else {
-          // Not an estate owner, show registration form
-          setActiveForm('estate-owner');
+          if (estateOwnerEthAddress) {
+            if (estateOwnerEthAddress !== walletAddress.toLowerCase()) {
+              setError('Wallet address does not match the registered estate owner address');
+              setLoading(false);
+              return;
+            }
+
+            // Already an estate owner, redirect to dashboard
+            setRole('estate-owner');
+            localStorage.setItem('userRole', 'estate-owner');
+            navigate('/dashboard/estate-owner');
+            return;
+          }
+        } catch (error) {
+          console.log('Not registered as an estate owner yet');
         }
+        
+        // Not an estate owner, redirect to signup page
+        navigate('/estate-owner-signup');
       } catch (error) {
         console.error('Error checking estate owner status:', error);
         setError('Error checking estate owner status. Please try again.');
@@ -102,8 +75,7 @@ const Home = ({ walletAddress, connectWalletPressed, setRole, role }) => {
     try {
       setLoading(true);
       const data = await adminLogin(loginData.email, loginData.password);
-      console.log(data)
-      console.log(data.data.user.ethAddress)
+      console.log(data.data.user.ethAddress);
       
       if (data.data.user.ethAddress.toLowerCase() !== walletAddress.toLowerCase()) {
         setError('Wallet address does not match the registered admin address');
@@ -160,48 +132,6 @@ const Home = ({ walletAddress, connectWalletPressed, setRole, role }) => {
     } catch (error) {
       console.error('Login error:', error);
       setError(error.message || 'Login failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleEstateOwnerRegistration = async (e) => {
-    e.preventDefault();
-    if (!walletAddress) {
-      setError('Please connect your wallet first');
-      return;
-    }
-    
-    try {
-      setLoading(true);
-      
-      // Create form data with all estate owner information
-      const formData = new FormData();
-      Object.keys(estateOwnerData).forEach(key => {
-        formData.append(key, estateOwnerData[key]);
-      });
-      
-      formData.append('ethAddress', walletAddress);
-      
-      if (kycDocumentImage) {
-        formData.append('kycDocumentImage', kycDocumentImage);
-      }
-      
-      if (ownershipDocumentImage) {
-        formData.append('ownershipDocumentImage', ownershipDocumentImage);
-      }
-      
-      // Register estate owner
-      const data = await registerEstateOwner(formData);
-      
-      setRole('estate-owner');
-      setSuccess('Registration successful! Redirecting...');
-      
-      setTimeout(() => {
-        navigate('/estate-owner');
-      }, 1500);
-    } catch (error) {
-      setError(error.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
@@ -285,186 +215,6 @@ const Home = ({ walletAddress, connectWalletPressed, setRole, role }) => {
                 
                 <Button variant="primary" type="submit" disabled={loading}>
                   {loading ? 'Logging in...' : 'Login'}
-                </Button>
-              </Form>
-            </Card.Body>
-          </Card>
-        );
-        
-      case 'estate-owner':
-        return (
-          <Card>
-            <Card.Header>Estate Owner Registration</Card.Header>
-            <Card.Body>
-              <Form onSubmit={handleEstateOwnerRegistration}>
-                <Row>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Name</Form.Label>
-                      <Form.Control
-                        type="text"
-                        name="name"
-                        value={estateOwnerData.name}
-                        onChange={handleEstateOwnerInputChange}
-                        required
-                      />
-                    </Form.Group>
-                  </Col>
-                  
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Country</Form.Label>
-                      <Form.Control
-                        type="text"
-                        name="country"
-                        value={estateOwnerData.country}
-                        onChange={handleEstateOwnerInputChange}
-                        required
-                      />
-                    </Form.Group>
-                  </Col>
-                </Row>
-                
-                <Row>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>State</Form.Label>
-                      <Form.Control
-                        type="text"
-                        name="state"
-                        value={estateOwnerData.state}
-                        onChange={handleEstateOwnerInputChange}
-                        required
-                      />
-                    </Form.Group>
-                  </Col>
-                  
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Address</Form.Label>
-                      <Form.Control
-                        type="text"
-                        name="address"
-                        value={estateOwnerData.address}
-                        onChange={handleEstateOwnerInputChange}
-                        required
-                      />
-                    </Form.Group>
-                  </Col>
-                </Row>
-                
-                <Row>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>KYC Type</Form.Label>
-                      <Form.Control
-                        as="select"
-                        name="kycType"
-                        value={estateOwnerData.kycType}
-                        onChange={handleEstateOwnerInputChange}
-                        required
-                      >
-                        <option value="">Select KYC Type</option>
-                        <option value="passport">Passport</option>
-                        <option value="drivers_license">Driver's License</option>
-                        <option value="national_id">National ID</option>
-                      </Form.Control>
-                    </Form.Group>
-                  </Col>
-                  
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>KYC ID</Form.Label>
-                      <Form.Control
-                        type="text"
-                        name="kycId"
-                        value={estateOwnerData.kycId}
-                        onChange={handleEstateOwnerInputChange}
-                        required
-                      />
-                    </Form.Group>
-                  </Col>
-                </Row>
-                
-                <Row>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>KYC Document Image</Form.Label>
-                      <Form.Control
-                        type="file"
-                        onChange={(e) => handleFileChange(e, setKycDocumentImage)}
-                        required
-                      />
-                    </Form.Group>
-                  </Col>
-                  
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Ownership Document Image</Form.Label>
-                      <Form.Control
-                        type="file"
-                        onChange={(e) => handleFileChange(e, setOwnershipDocumentImage)}
-                        required
-                      />
-                    </Form.Group>
-                  </Col>
-                </Row>
-                
-                <Form.Group className="mb-3">
-                  <Form.Label>Real Estate Information</Form.Label>
-                  <Form.Control
-                    as="textarea"
-                    rows={3}
-                    name="realEstateInfo"
-                    value={estateOwnerData.realEstateInfo}
-                    onChange={handleEstateOwnerInputChange}
-                    required
-                  />
-                </Form.Group>
-                
-                <Row>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Current Estate Cost (in USD)</Form.Label>
-                      <Form.Control
-                        type="number"
-                        name="currentEstateCost"
-                        value={estateOwnerData.currentEstateCost}
-                        onChange={handleEstateOwnerInputChange}
-                        required
-                      />
-                    </Form.Group>
-                  </Col>
-                  
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Percentage to Tokenize (0-100)</Form.Label>
-                      <Form.Control
-                        type="number"
-                        name="percentageToTokenize"
-                        value={estateOwnerData.percentageToTokenize}
-                        onChange={handleEstateOwnerInputChange}
-                        min="0"
-                        max="100"
-                        required
-                      />
-                    </Form.Group>
-                  </Col>
-                </Row>
-                
-                <Form.Group className="mb-3">
-                  <Form.Label>Signature (Sign a message with your wallet)</Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="signature"
-                    value={estateOwnerData.signature}
-                    onChange={handleEstateOwnerInputChange}
-                    required
-                  />
-                </Form.Group>
-                
-                <Button variant="primary" type="submit" disabled={loading}>
-                  {loading ? 'Registering...' : 'Register'}
                 </Button>
               </Form>
             </Card.Body>
