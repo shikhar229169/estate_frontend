@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
 import getContractConfig from '../contracts/contractConfig';
-import { Await } from 'react-router-dom';
+import TokenizedRealEstateABI from '../contracts/abi/TokenizedRealEstate';
+import ERC20ABI from '../contracts/abi/ERC20ABI';
 
 // Connect to wallet
 export const connectWallet = async () => {
@@ -224,7 +225,7 @@ export const getContracts = (chainId) => {
 export const getERC20Contract = (tokenAddress, signer) => {
   return new ethers.Contract(
     tokenAddress,
-    getContractConfig(11155111).USDC.abi, // Default to Sepolia ABI
+    ERC20ABI,
     signer
   );
 };
@@ -318,18 +319,28 @@ export const getAllTokenizedRealEstates = async (signer) => {
         // Get the tokenized real estate contract
         const tokenContract = new ethers.Contract(
           tokenAddress,
-          [
-            'function name() view returns (string)',
-            'function symbol() view returns (string)',
-            'function totalSupply() view returns (uint256)'
-          ],
+          TokenizedRealEstateABI,
           signer
         );
         
         // Get token details
-        const name = await tokenContract.name();
-        const symbol = await tokenContract.symbol();
+        const nameWithAddr = await tokenContract.name();
+        const symbolWithAddr = await tokenContract.symbol();
+
+        const name = nameWithAddr.split(' - ')[0];
+        const symbol = symbolWithAddr.split('-')[0];
+        const estateOwner = nameWithAddr.split(' - ')[1];
+
         const totalSupply = await tokenContract.totalSupply();
+        const paymentToken = await tokenContract.getPaymentToken();
+        let paymentTokenSymbol;
+        if (paymentToken === ethers.constants.AddressZero) {
+          paymentTokenSymbol = chainId === 43113 ? 'AVAX' : 'ETH';
+        }
+        else {
+          const paymentTokenContract = getERC20Contract(paymentToken, signer);
+          paymentTokenSymbol = await paymentTokenContract.symbol();
+        }
         
         console.log(`Token ID ${tokenId} details: ${name} (${symbol}), Total Supply: ${totalSupply.toString()}`);
         
@@ -338,7 +349,11 @@ export const getAllTokenizedRealEstates = async (signer) => {
           address: tokenAddress,
           name,
           symbol,
-          totalSupply: totalSupply // Store as BigNumber
+          estateOwner,
+          totalSupply: totalSupply, // Store as BigNumber
+          maxTreMintable: contractConfig.TokenizedRealEstate.MAX_TRE_MINTABLE,
+          paymentToken: paymentToken,
+          paymentTokenSymbol: paymentTokenSymbol
         });
       } catch (error) {
         console.error(`Error fetching token ID ${tokenId}:`, error);

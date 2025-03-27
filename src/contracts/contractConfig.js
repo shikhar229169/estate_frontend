@@ -5,6 +5,7 @@ import EstateVerificationABI from './abi/EstateVerification';
 import AssetTokenizationManagerABI from './abi/AssetTokenizationManager';
 import VerifyingOperatorVaultABI from './abi/VerifyingOperatorVault';
 import addresses from './abi/addresses';
+import { ethers } from 'ethers';
 
 // Function to get contract configuration based on chain ID
 const getContractConfig = (chainId) => {
@@ -33,6 +34,9 @@ const getContractConfig = (chainId) => {
     USDC: {
       address: networkAddresses.usdc,
       abi: ERC20ABI
+    },
+    TokenizedRealEstate: {
+      MAX_TRE_MINTABLE: ethers.utils.parseEther("1000000")
     }
   };
 };

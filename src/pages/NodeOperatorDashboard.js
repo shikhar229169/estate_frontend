@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Tab, Tabs, Card, Form, Button, Table, Alert, Spinner, Modal } from 'react-bootstrap';
 import { ethers } from 'ethers';
 import { getContracts, switchNetwork } from '../utils/interact';
-import { getEstateOwnersByNodeOperator, updateEstateOwner, getNodeOperatorByWalletAddress, updateNodeOperatorAutoUpdate } from '../utils/api';
+import { getEstateOwnersByNodeOperator, updateEstateOwnerByNode, getNodeOperatorByWalletAddress, updateNodeOperatorAutoUpdate } from '../utils/api';
 import VerifyingOperatorVaultABI from '../contracts/abi/VerifyingOperatorVault';
 
 const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
@@ -285,7 +285,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
       await tx.wait();
       
       // Update estate owner status in backend using _id
-      await updateEstateOwner(verifyEstateOwnerForm.estateOwnerId);
+      await updateEstateOwnerByNode(verifyEstateOwnerForm.estateOwnerId);
       
       setSuccess('Estate owner verified successfully!');
       

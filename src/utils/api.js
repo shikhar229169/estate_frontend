@@ -439,7 +439,19 @@ export const getEstateOwnersByNodeOperator = async (nodeOperatorEns) => {
   }
 };
 
-export const updateEstateOwner = async (userId) => {
+// Currently used to update estate cost and estate rewards
+export const updateEstateOwnerData = async(estateOwnerId, bodyData) => {
+  try {
+    const response = await api.patch(`/user/update/${estateOwnerId}`, bodyData, { headers: { 'x-api-key': 123 } });
+    return response.data;
+  }
+  catch (error) {
+    console.error('Estate owner update error:', error);
+    throw error;
+  }
+}
+
+export const updateEstateOwnerByNode = async (userId) => {
   try {
     const response = await api.patch(`/node/users/${userId}/verify`)
     return response.data;

@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Table, Alert, Spinner, Form, Tab, Tabs, Modal } from 'react-bootstrap';
 import { ethers } from 'ethers';
 import { getContracts, switchNetwork } from '../utils/interact';
-import { getEstateOwnerByAddress } from '../utils/api';
+import { getEstateOwnerByAddress, updateEstateOwnerData } from '../utils/api';
 import TokenizedRealEstateABI from '../contracts/abi/TokenizedRealEstate';
+import ERC20ABI from '../contracts/abi/ERC20ABI';
 
 const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
   const [activeTab, setActiveTab] = useState('estateDetails');
@@ -13,20 +14,17 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
   const [success, setSuccess] = useState('');
   const [estateOwner, setEstateOwner] = useState(null);
   const [tokenizationDetails, setTokenizationDetails] = useState(null);
-  const [showTokenizeModal, setShowTokenizeModal] = useState(false);
   const [tokenSymbol, setTokenSymbol] = useState('');
   const [tokenContractAddr, setTokenContractAddr] = useState('');
   const [tokenDecimals, setTokenDecimals] = useState(18);
   const [formattedEstateCost, setFormattedEstateCost] = useState('');
+  const [formattedRewards, setFormattedRewards] = useState(''); // New state for formatted rewards
 
-  // Form states for tokenization
-  const [tokenizeForm, setTokenizeForm] = useState({
-    tokenName: '',
-    tokenSymbol: '',
-    tokenSupply: '',
-    tokenPrice: '',
-    initialSalePercentage: '50'
-  });
+  // New state variables for estate cost update and rewards
+  const [showUpdateCostModal, setShowUpdateCostModal] = useState(false);
+  const [showRewardsModal, setShowRewardsModal] = useState(false);
+  const [newEstateCost, setNewEstateCost] = useState('');
+  const [estateRewards, setEstateRewards] = useState('');
 
   useEffect(() => {
     const loadContracts = async () => {
@@ -34,31 +32,31 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
         const contractInstances = getContracts(chainId);
         if (contractInstances && !contractInstances.error) {
           setContracts(contractInstances);
-          
+
           // Try to get tokenization details if estate is already tokenized
           try {
             // Use the correct function from assetTokenizationManager instead of realEstateRegistry
             const tokenizedRealEstate = await contractInstances.assetTokenizationManager.getEstateOwnerToTokeinzedRealEstate(walletAddress);
-            
+
             if (tokenizedRealEstate && tokenizedRealEstate !== ethers.constants.AddressZero) {
               // Get details from the tokenized real estate contract if available
               try {
                 const provider = new ethers.providers.Web3Provider(window.ethereum);
-                
+
                 // Create contract instance for the tokenized real estate
                 const tokenContract = new ethers.Contract(
                   tokenizedRealEstate,
                   TokenizedRealEstateABI,
                   provider
                 );
-                
+
                 // Get token details
                 const tokenName = await tokenContract.name();
                 const tokenSymbol = await tokenContract.symbol();
                 const tokenSupply = await tokenContract.totalSupply();
                 const tokenPrice = await tokenContract.getPerEstateTokenPrice();
                 const decimals = await tokenContract.decimals();
-                
+
                 console.log("<MEEEEOW:", tokenSupply);
 
                 setTokenizationDetails({
@@ -86,7 +84,7 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
         }
       }
     };
-    
+
     const loadEstateOwner = async () => {
       if (walletAddress) {
         try {
@@ -94,12 +92,12 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
           const data = await getEstateOwnerByAddress(walletAddress);
           const estateOwner = data.data.user;
           setEstateOwner(estateOwner);
-          
+
           // Get token information if available
           if (estateOwner && estateOwner.token) {
             try {
               const provider = new ethers.providers.Web3Provider(window.ethereum);
-              
+
               // Check if token is native token (address 0)
               if (estateOwner.token === ethers.constants.AddressZero) {
                 setTokenSymbol(chainId === 43114 ? 'AVAX' : 'ETH');
@@ -109,22 +107,19 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
                 // Get token contract
                 const tokenContract = new ethers.Contract(
                   estateOwner.token,
-                  [
-                    "function symbol() view returns (string)",
-                    "function decimals() view returns (uint8)"
-                  ],
+                  ERC20ABI,
                   provider
                 );
-                
+
                 // Get token symbol and decimals
                 const symbol = await tokenContract.symbol();
                 const decimals = await tokenContract.decimals();
-                
+
                 setTokenSymbol(symbol);
                 setTokenContractAddr(estateOwner.token);
                 setTokenDecimals(decimals);
               }
-              
+
               // Format estate cost based on token decimals
               if (estateOwner.currentEstateCost) {
                 try {
@@ -136,6 +131,20 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
                 } catch (error) {
                   console.error('Error formatting estate cost:', error);
                   setFormattedEstateCost(estateOwner.currentEstateCost);
+                }
+              }
+
+              // Format rewards based on token decimals
+              if (estateOwner.rewards) {
+                try {
+                  const formattedRewardsValue = ethers.utils.formatUnits(
+                    estateOwner.rewards,
+                    tokenDecimals
+                  );
+                  setFormattedRewards(formattedRewardsValue);
+                } catch (error) {
+                  console.error('Error formatting rewards:', error);
+                  setFormattedRewards(estateOwner.rewards);
                 }
               }
             } catch (error) {
@@ -151,99 +160,105 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
         }
       }
     };
-    
+
     loadContracts();
     loadEstateOwner();
   }, [walletAddress, chainId, tokenDecimals]);
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setTokenizeForm({ ...tokenizeForm, [name]: value });
-  };
-
-  const handleTokenize = async (e) => {
+  // New function to handle estate cost update
+  const handleUpdateEstateCost = async (e) => {
     e.preventDefault();
-    if (!contracts || !contracts.realEstateRegistry) {
-      setError('Contracts not loaded');
+    if (!tokenizationDetails || !tokenizationDetails.isTokenized) {
+      setError('Your estate is not tokenized yet');
       return;
     }
-    
-    if (!estateOwner || !estateOwner.isVerified) {
-      setError('Your estate must be verified before tokenization');
-      return;
-    }
-    
+
     setLoading(true);
     setError('');
     setSuccess('');
-    
+
     try {
-      // Calculate token supply based on estate value and tokenization percentage
-      const estateValue = parseFloat(estateOwner.currentEstateCost);
-      const tokenizationPercentage = parseFloat(estateOwner.percentageToTokenize);
-      const tokenizedValue = (estateValue * tokenizationPercentage) / 100;
-      const tokenSupply = parseFloat(tokenizeForm.tokenSupply);
-      const tokenPrice = tokenizedValue / tokenSupply;
-      
-      // Tokenize the estate
-      const tx = await contracts.realEstateRegistry.tokenizeEstate(
-        tokenizeForm.tokenName,
-        tokenizeForm.tokenSymbol,
-        ethers.utils.parseEther(tokenizeForm.tokenSupply),
-        ethers.utils.parseEther(tokenPrice.toString()),
-        tokenizeForm.initialSalePercentage
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+
+      // Create contract instance for the tokenized real estate
+      const tokenContract = new ethers.Contract(
+        tokenizationDetails.tokenAddress,
+        TokenizedRealEstateABI,
+        signer
       );
-      
+
+      // Convert the cost to the correct format with decimals
+      const newCostInWei = ethers.utils.parseUnits(newEstateCost, tokenizationDetails.decimals || 18);
+
+      // Call the update estate cost function
+      const tx = await tokenContract.updateEstateCost(newCostInWei);
       await tx.wait();
-      
-      setSuccess('Estate tokenized successfully!');
-      setShowTokenizeModal(false);
-      
-      // Refresh tokenization details
-      const tokenizedRealEstate = await contracts.assetTokenizationManager.getEstateOwnerToTokeinzedRealEstate(walletAddress);
-      if (tokenizedRealEstate && tokenizedRealEstate !== ethers.constants.AddressZero) {
-        setTokenizationDetails({
-          tokenAddress: tokenizedRealEstate,
-          isTokenized: true
-        });
-      }
+
+      await updateEstateOwnerData(estateOwner._id, { currentEstateCost: newCostInWei.toString() });
+      const currTokenPrice = await tokenContract.getPerEstateTokenPrice()
+
+      setFormattedEstateCost(newEstateCost);
+      setTokenizationDetails({ ...tokenizationDetails, tokenPrice: currTokenPrice });
+
+      setSuccess('Estate cost updated successfully!');
+      setShowUpdateCostModal(false);
+      setNewEstateCost('');
     } catch (error) {
-      setError(`Error: ${error.message}`);
+      setError(`Error updating estate cost: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleWithdrawFunds = async () => {
-    if (!contracts || !contracts.realEstateRegistry) {
-      setError('Contracts not loaded');
-      return;
-    }
-    
+  // New function to handle sending regular estate rewards
+  const handleSendRewards = async (e) => {
+    e.preventDefault();
     if (!tokenizationDetails || !tokenizationDetails.isTokenized) {
       setError('Your estate is not tokenized yet');
       return;
     }
-    
+
     setLoading(true);
     setError('');
     setSuccess('');
-    
+
     try {
-      const tx = await contracts.realEstateRegistry.withdrawFunds();
-      await tx.wait();
-      setSuccess('Funds withdrawn successfully!');
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+
+      // Create contract instance for the tokenized real estate
+      const tokenContract = new ethers.Contract(
+        tokenizationDetails.tokenAddress,
+        TokenizedRealEstateABI,
+        signer
+      );
+
+      // Convert the rewards to the correct format with decimals
+      const prevRewardsInWei = ethers.utils.parseUnits(formattedRewards, tokenizationDetails.decimals || 18);
+      const rewardsInWei = ethers.utils.parseUnits(estateRewards, tokenizationDetails.decimals || 18);
+
+      const paymentToken = new ethers.Contract(estateOwner.token, ERC20ABI, signer);
+      const allowance = await paymentToken.allowance(walletAddress, tokenizationDetails.tokenAddress);
       
-      // Refresh tokenization details
-      const tokenizedRealEstate = await contracts.assetTokenizationManager.getEstateOwnerToTokeinzedRealEstate(walletAddress);
-      if (tokenizedRealEstate && tokenizedRealEstate !== ethers.constants.AddressZero) {
-        setTokenizationDetails({
-          tokenAddress: tokenizedRealEstate,
-          isTokenized: true
-        });
+      if (allowance.lt(rewardsInWei)) {
+        const approveRewardTxn = await paymentToken.approve(tokenizationDetails.tokenAddress, rewardsInWei);
+        await approveRewardTxn.wait();
       }
+
+      // Call the send rewards function
+      const tx = await tokenContract.sendRegularEstateRewardsAccumulated(rewardsInWei);
+      await tx.wait();
+
+      await updateEstateOwnerData(estateOwner._id, { rewards: (prevRewardsInWei.add(rewardsInWei)).toString() });
+      setFormattedRewards((Number(formattedRewards) + Number(estateRewards)).toString());
+
+      setSuccess('Estate rewards sent successfully!');
+      setShowRewardsModal(false);
+      setEstateRewards('');
     } catch (error) {
-      setError(`Error: ${error.message}`);
+      console.log(error);
+      setError(`Error sending rewards`);
     } finally {
       setLoading(false);
     }
@@ -262,14 +277,14 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
       <div className="text-center">
         <h2>Please connect to a supported network</h2>
         <div className="mt-4">
-          <Button 
-            variant="primary" 
+          <Button
+            variant="primary"
             className="me-2"
             onClick={() => switchNetwork(43113)}
           >
             Switch to Fuji
           </Button>
-          <Button 
+          <Button
             variant="primary"
             onClick={() => switchNetwork(11155111)}
           >
@@ -305,10 +320,10 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
   return (
     <div className="estate-owner-dashboard">
       <h2 className="mb-4">Estate Owner Dashboard</h2>
-      
+
       {error && <Alert variant="danger">{error}</Alert>}
       {success && <Alert variant="success">{success}</Alert>}
-      
+
       {loading && (
         <div className="text-center mb-4">
           <Spinner animation="border" role="status">
@@ -316,7 +331,7 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
           </Spinner>
         </div>
       )}
-      
+
       <Tabs
         activeKey={activeTab}
         onSelect={(k) => setActiveTab(k)}
@@ -365,6 +380,18 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
                     </td>
                   </tr>
                   <tr>
+                    <th>Rewards Streamed</th>
+                    <td>
+                      {formattedRewards ? (
+                        <>
+                          {formattedRewards} {tokenSymbol}
+                        </>
+                      ) : (
+                        estateOwner.rewards || '0'
+                      )}
+                    </td>
+                  </tr>
+                  <tr>
                     <th>Payment Token</th>
                     <td>{tokenSymbol || 'Not specified'} {`(${tokenContractAddr || ''})`}</td>
                   </tr>
@@ -384,17 +411,29 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
                   </tr>
                 </tbody>
               </Table>
-              
-              {estateOwner.isVerified && !tokenizationDetails?.isTokenized && (
-                <Button 
-                  variant="primary" 
-                  onClick={() => setShowTokenizeModal(true)}
-                  disabled={loading}
-                >
-                  Tokenize Estate
-                </Button>
-              )}
-              
+
+              <div className="d-flex flex-wrap gap-2 mt-3">
+                {estateOwner.isVerified && tokenizationDetails?.isTokenized && chainId === 43113 && (
+                  <>
+                    <Button
+                      variant="primary"
+                      onClick={() => setShowUpdateCostModal(true)}
+                      disabled={loading}
+                    >
+                      Update Estate Cost
+                    </Button>
+
+                    <Button
+                      variant="info"
+                      onClick={() => setShowRewardsModal(true)}
+                      disabled={loading}
+                    >
+                      Send Estate Rewards
+                    </Button>
+                  </>
+                )}
+              </div>
+
               {!estateOwner.isVerified && (
                 <Alert variant="info">
                   Your estate needs to be verified by a node operator before you can tokenize it.
@@ -403,7 +442,7 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
             </Card.Body>
           </Card>
         </Tab>
-        
+
         {tokenizationDetails?.isTokenized && (
           <Tab eventKey="tokenDetails" title="Token Details">
             <Card>
@@ -426,14 +465,14 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
                     <tr>
                       <th>Token Supply</th>
                       <td>
-                        {tokenizationDetails.tokenSupply && tokenizationDetails.decimals ? 
+                        {tokenizationDetails.tokenSupply && tokenizationDetails.decimals ?
                           ethers.utils.formatUnits(tokenizationDetails.tokenSupply, tokenizationDetails.decimals) : 'N/A'} {tokenizationDetails.tokenSymbol.substr(0, 3) || ''}
                       </td>
                     </tr>
                     <tr>
                       <th>Token Price</th>
                       <td>
-                        {tokenizationDetails.tokenPrice && tokenizationDetails.decimals ? 
+                        {tokenizationDetails.tokenPrice && tokenizationDetails.decimals ?
                           `$${ethers.utils.formatUnits(tokenizationDetails.tokenPrice, tokenizationDetails.decimals)}` : 'N/A'}
                       </td>
                     </tr>
@@ -444,123 +483,83 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
                     <tr>
                       <th>Tokens Sold</th>
                       <td>
-                        {tokenizationDetails.tokensSold && tokenizationDetails.decimals ? 
+                        {tokenizationDetails.tokensSold && tokenizationDetails.decimals ?
                           ethers.utils.formatUnits(tokenizationDetails.tokensSold, tokenizationDetails.decimals) : 'N/A'} {tokenizationDetails.tokenSymbol || ''}
                       </td>
                     </tr>
                     <tr>
                       <th>Funds Raised</th>
                       <td>
-                        {tokenizationDetails.fundsRaised && tokenizationDetails.decimals ? 
+                        {tokenizationDetails.fundsRaised && tokenizationDetails.decimals ?
                           `$${ethers.utils.formatUnits(tokenizationDetails.fundsRaised, tokenizationDetails.decimals)}` : 'N/A'}
                       </td>
                     </tr>
                     <tr>
                       <th>Funds Withdrawn</th>
                       <td>
-                        {tokenizationDetails.fundsWithdrawn && tokenizationDetails.decimals ? 
+                        {tokenizationDetails.fundsWithdrawn && tokenizationDetails.decimals ?
                           `$${ethers.utils.formatUnits(tokenizationDetails.fundsWithdrawn, tokenizationDetails.decimals)}` : 'N/A'}
                       </td>
                     </tr>
                   </tbody>
                 </Table>
-                
-                {tokenizationDetails.fundsRaised && tokenizationDetails.fundsWithdrawn && tokenizationDetails.decimals && 
-                  parseFloat(ethers.utils.formatUnits(tokenizationDetails.fundsRaised, tokenizationDetails.decimals)) > 
-                  parseFloat(ethers.utils.formatUnits(tokenizationDetails.fundsWithdrawn, tokenizationDetails.decimals)) && (
-                  <Button 
-                    variant="success" 
-                    onClick={handleWithdrawFunds}
-                    disabled={loading}
-                  >
-                    Withdraw Available Funds
-                  </Button>
-                )}
               </Card.Body>
             </Card>
           </Tab>
         )}
       </Tabs>
-      
-      {/* Tokenize Modal */}
-      <Modal show={showTokenizeModal} onHide={() => setShowTokenizeModal(false)}>
+
+      {/* Update Estate Cost Modal */}
+      <Modal show={showUpdateCostModal} onHide={() => setShowUpdateCostModal(false)}>
         <Modal.Header closeButton>
-          <Modal.Title>Tokenize Your Estate</Modal.Title>
+          <Modal.Title>Update Estate Cost</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Form onSubmit={handleTokenize}>
+          <Form onSubmit={handleUpdateEstateCost}>
             <Form.Group className="mb-3">
-              <Form.Label>Token Name</Form.Label>
-              <Form.Control
-                type="text"
-                name="tokenName"
-                value={tokenizeForm.tokenName}
-                onChange={handleInputChange}
-                placeholder="e.g., Real Estate Token"
-                required
-              />
-            </Form.Group>
-            
-            <Form.Group className="mb-3">
-              <Form.Label>Token Symbol</Form.Label>
-              <Form.Control
-                type="text"
-                name="tokenSymbol"
-                value={tokenizeForm.tokenSymbol}
-                onChange={handleInputChange}
-                placeholder="e.g., RET"
-                required
-              />
-            </Form.Group>
-            
-            <Form.Group className="mb-3">
-              <Form.Label>Token Supply</Form.Label>
+              <Form.Label>New Estate Cost</Form.Label>
               <Form.Control
                 type="number"
-                name="tokenSupply"
-                value={tokenizeForm.tokenSupply}
-                onChange={handleInputChange}
-                placeholder="e.g., 1000000"
+                value={newEstateCost}
+                onChange={(e) => setNewEstateCost(e.target.value)}
+                placeholder="Enter new cost"
                 required
               />
               <Form.Text className="text-muted">
-                The total number of tokens to create
+                This will update the valuation of your estate (Enter amount in terms of your payment token)
               </Form.Text>
             </Form.Group>
-            
-            <Form.Group className="mb-3">
-              <Form.Label>Initial Sale Percentage</Form.Label>
-              <Form.Control
-                type="number"
-                name="initialSalePercentage"
-                value={tokenizeForm.initialSalePercentage}
-                onChange={handleInputChange}
-                min="1"
-                max="100"
-                required
-              />
-              <Form.Text className="text-muted">
-                Percentage of tokens available for initial sale
-              </Form.Text>
-            </Form.Group>
-            
-            <div className="mb-3">
-              <h6>Summary</h6>
-              <p>
-                Estate Value: ${estateOwner.currentEstateCost}<br />
-                Tokenization Percentage: {estateOwner.percentageToTokenize}%<br />
-                Tokenized Value: ${(parseFloat(estateOwner.currentEstateCost) * parseFloat(estateOwner.percentageToTokenize) / 100).toFixed(2)}
-              </p>
-              
-              {tokenizeForm.tokenSupply && (
-                <p>
-                  Token Price: ${(parseFloat(estateOwner.currentEstateCost) * parseFloat(estateOwner.percentageToTokenize) / 100 / parseFloat(tokenizeForm.tokenSupply)).toFixed(6)} per token
-                </p>
-              )}
-            </div>
-            
+
             <Button variant="primary" type="submit" disabled={loading}>
-              {loading ? 'Processing...' : 'Tokenize Estate'}
+              {loading ? 'Processing...' : 'Update Cost'}
+            </Button>
+          </Form>
+        </Modal.Body>
+      </Modal>
+
+      {/* Send Estate Rewards Modal */}
+      <Modal show={showRewardsModal} onHide={() => setShowRewardsModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Send Estate Rewards</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form onSubmit={handleSendRewards}>
+            <Form.Group className="mb-3">
+              <Form.Label>Reward Amount</Form.Label>
+              <Form.Control
+                type="number"
+                value={estateRewards}
+                onChange={(e) => setEstateRewards(e.target.value)}
+                placeholder="Enter reward amount"
+                required
+              />
+              <Form.Text className="text-muted">
+                These rewards will be distributed to token holders proportionally
+              </Form.Text>
+            </Form.Group>
+
+            <Button variant="primary" type="submit" disabled={loading}>
+              {loading ? 'Processing...' : 'Send Rewards'}
             </Button>
           </Form>
         </Modal.Body>

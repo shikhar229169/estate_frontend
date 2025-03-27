@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Table, Alert, Spinner, Form, Row, Col, Modal } from 'react-bootstrap';
 import { ethers } from 'ethers';
-import { getContracts, switchNetwork, getAllTokenizedRealEstates } from '../utils/interact';
+import { getContracts, switchNetwork, getAllTokenizedRealEstates, getERC20Contract } from '../utils/interact';
+import TokenizedRealEstateABI from '../contracts/abi/TokenizedRealEstate';
+// Import FontAwesome icons
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faShoppingCart, faTags, faCoins, faMoneyBillTransfer, faExchangeAlt, faDollarSign, faSnowflake } from '@fortawesome/free-solid-svg-icons';
 
 const UserDashboard = ({ walletAddress, chainId }) => {
   const [contracts, setContracts] = useState(null);
@@ -9,13 +13,16 @@ const UserDashboard = ({ walletAddress, chainId }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [tokenizedEstates, setTokenizedEstates] = useState([]);
-  const [userTokenBalances, setUserTokenBalances] = useState({});
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [selectedEstate, setSelectedEstate] = useState(null);
   const [buyAmount, setBuyAmount] = useState('');
   const [showSellModal, setShowSellModal] = useState(false);
   const [sellAmount, setSellAmount] = useState('');
   const [currentChainId, setCurrentChainId] = useState(null);
+  const [showDepositCollateralModal, setShowDepositCollateralModal] = useState(false);
+  const [showWithdrawCollateralModal, setShowWithdrawCollateralModal] = useState(false);
+  const [depositCollateralAmount, setDepositCollateralAmount] = useState('');
+  const [withdrawCollateralAmount, setWithdrawCollateralAmount] = useState('');
 
   useEffect(() => {
     if (window.ethereum) {
@@ -52,6 +59,22 @@ const UserDashboard = ({ walletAddress, chainId }) => {
     loadContracts();
   }, [walletAddress, chainId]);
 
+  const formatTREAmount = (amount) => {
+    return ethers.utils.formatUnits(amount, 18);
+  }
+
+  const formatTokenAmount = async(amount, token, signer) => {
+    let decimals;
+    if (token === ethers.constants.AddressZero) {
+      decimals = 18;
+    }
+    else {
+      const tokenContract = getERC20Contract(token, contracts?.signer || signer);
+      decimals = await tokenContract.decimals();
+    }
+    return ethers.utils.formatUnits(amount, decimals);
+  }
+
   const loadTokenizedEstates = async (contractInstances) => {
     try {
       setLoading(true);
@@ -60,35 +83,56 @@ const UserDashboard = ({ walletAddress, chainId }) => {
       console.log(`Loading tokenized estates for chain ID: ${contractInstances.chainId}`);
       
       const estates = await getAllTokenizedRealEstates(contractInstances.signer);
-      const balances = {};
       
       for (const estate of estates) {
         try {
           const tokenContract = new ethers.Contract(
             estate.address,
-            ['function balanceOf(address owner) view returns (uint256)', 'function allowance(address owner, address spender) view returns (uint256)'],
+            TokenizedRealEstateABI,
             contractInstances.signer
           );
           
-          const balance = await tokenContract.balanceOf(walletAddress);
-          balances[estate.address] = balance;
-          
+          const balance = await tokenContract.getEstateTokensMintedBy(walletAddress);
+
+          // Allowance
           const allowance = await tokenContract.allowance(walletAddress, contractInstances.realEstateRegistry.address);
           
           estate.balance = balance;
           estate.allowance = allowance;
-          estate.tokenPrice = ethers.utils.parseEther('0.01'); 
+          estate.tokenPrice = await tokenContract.getPerEstateTokenPrice(); 
           
-          // Calculate tokens available (30% of total supply) - properly convert to BigNumber
           const totalSupplyBN = ethers.BigNumber.from(estate.totalSupply);
-          estate.tokensAvailable = totalSupplyBN.mul(30).div(100); // 30% of total supply
+          estate.tokensAvailable = estate.maxTreMintable.sub(totalSupplyBN);
+
+          const formattedTokenPrice = await formatTokenAmount(estate.tokenPrice, estate.paymentToken, contractInstances.signer);
+          estate.formattedTokenPrice = formattedTokenPrice;
+          
+          // Load user's collateral for this estate
+          try {
+            const userCollateralAmount = await tokenContract.getCollateralDepositedBy(walletAddress);
+            estate.userCollateral = userCollateralAmount;
+            
+            // Format user collateral based on payment token decimals
+            const formattedCollateral = await formatTokenAmount(userCollateralAmount, estate.paymentToken, contractInstances.signer);
+
+            if (chainId === 43113) {
+              const allChainsBalance = await tokenContract.balanceOf(walletAddress);
+              estate.allChainsBalance = allChainsBalance;
+            }
+
+            estate.formattedCollateral = formattedCollateral;
+          } catch (error) {
+            console.error(`Error fetching collateral for ${estate.address}:`, error);
+            estate.userCollateral = ethers.BigNumber.from(0);
+            estate.formattedCollateral = "0";
+          }
+
         } catch (error) {
           console.error(`Error fetching balance for token ${estate.address}:`, error);
         }
       }
       
       setTokenizedEstates(estates);
-      setUserTokenBalances(balances);
     } catch (error) {
       console.error('Error loading tokenized estates:', error);
       setError(`Error loading tokenized estates: ${error.message}`);
@@ -99,7 +143,7 @@ const UserDashboard = ({ walletAddress, chainId }) => {
 
   const handleBuyTokens = async (e) => {
     e.preventDefault();
-    if (!contracts || !contracts.realEstateRegistry || !selectedEstate) {
+    if (!contracts || !selectedEstate) {
       setError('Contracts not loaded or no estate selected');
       return;
     }
@@ -123,19 +167,32 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         return;
       }
       
-      // Calculate total cost (buyAmount * tokenPrice)
-      const totalCost = buyAmountWei.mul(selectedEstate.tokenPrice).div(ethers.utils.parseEther('1'));
-      
-      // Buy tokens
-      const tx = await contracts.realEstateRegistry.buyTokens(
-        selectedEstate.id,
-        buyAmountWei,
-        { value: totalCost }
+      const tokenContract = new ethers.Contract(
+        selectedEstate.address,
+        TokenizedRealEstateABI,
+        contracts.signer
       );
       
-      await tx.wait();
+      // Buy tokens
+      if (chainId === 43113) {
+        const tx = await tokenContract.buyRealEstatePartialOwnershipWithCollateral(
+          buyAmountWei
+        );
+        
+        await tx.wait();
+        setSuccess(`Successfully purchased ${buyAmount} ${selectedEstate.symbol} tokens!`);
+      }
+      else {
+        const tx = await tokenContract.buyRealEstatePartialOwnershipOnNonBaseChain(
+          buyAmountWei,
+          false, // mintIfLess
+          500000 // gasLimit
+        );
+        
+        await tx.wait();
+        setSuccess(`Cross Chain Purchase Request Placed ${buyAmount} ${selectedEstate.symbol} tokens!`);
+      }
       
-      setSuccess(`Successfully purchased ${buyAmount} ${selectedEstate.symbol} tokens!`);
       setShowBuyModal(false);
       setBuyAmount('');
       
@@ -151,7 +208,7 @@ const UserDashboard = ({ walletAddress, chainId }) => {
 
   const handleSellTokens = async (e) => {
     e.preventDefault();
-    if (!contracts || !contracts.realEstateRegistry || !selectedEstate) {
+    if (!contracts || !selectedEstate) {
       setError('Contracts not loaded or no estate selected');
       return;
     }
@@ -175,38 +232,33 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         return;
       }
       
-      // Check if allowance is needed
-      if (selectedEstate.allowance.lt(sellAmountWei)) {
-        // Create token contract instance
-        const tokenContract = new ethers.Contract(
-          selectedEstate.address, 
-          ['function approve(address spender, uint256 amount) public returns (bool)'],
-          contracts.signer
-        );
-        
-        console.log(`Approving tokens for sale: ${sellAmountWei.toString()} to ${contracts.realEstateRegistry.address}`);
-        
-        // Approve tokens
-        const approveTx = await tokenContract.approve(
-          contracts.realEstateRegistry.address,
-          ethers.constants.MaxUint256 
-        );
-        
-        await approveTx.wait();
-        console.log('Approval transaction complete');
-      }
-      
       console.log(`Selling tokens: ${sellAmountWei.toString()} of token ID ${selectedEstate.id}`);
       
-      // Sell tokens
-      const tx = await contracts.realEstateRegistry.sellTokens(
-        selectedEstate.id,
-        sellAmountWei
+      const tokenContract = new ethers.Contract(
+        selectedEstate.address,
+        TokenizedRealEstateABI,
+        contracts.signer
       );
       
-      await tx.wait();
+      // Buy tokens
+      if (chainId === 43113) {
+        const tx = await tokenContract.burnEstateOwnershipTokens(
+          sellAmountWei
+        );
+        
+        await tx.wait();
+        setSuccess(`Successfully sold ${sellAmount} ${selectedEstate.symbol} tokens!`);
+      }
+      else {
+        const tx = await tokenContract.burnEstateOwnershipTokensOnNonBaseChain(
+          sellAmountWei,
+          500000 // gasLimit
+        );
+        
+        await tx.wait();
+        setSuccess(`Cross Chain Sell Request Placed ${sellAmount} ${selectedEstate.symbol} tokens!`);
+      }
       
-      setSuccess(`Successfully sold ${sellAmount} ${selectedEstate.symbol} tokens!`);
       setShowSellModal(false);
       setSellAmount('');
       
@@ -215,6 +267,134 @@ const UserDashboard = ({ walletAddress, chainId }) => {
     } catch (error) {
       console.error('Error selling tokens:', error);
       setError(`Error selling tokens: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDepositCollateral = async (e) => {
+    e.preventDefault();
+    if (!contracts || !selectedEstate) {
+      setError('Contracts not loaded or no estate selected');
+      return;
+    }
+    
+    if (!depositCollateralAmount || parseFloat(depositCollateralAmount) <= 0) {
+      setError('Please enter a valid amount to deposit');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      // Create contract instances
+      const tokenContract = new ethers.Contract(
+        selectedEstate.address,
+        TokenizedRealEstateABI,
+        contracts.signer
+      );
+      
+      // Get payment token contract
+      const paymentToken = getERC20Contract(selectedEstate.paymentToken, contracts.signer);
+      
+      // Get decimals for the payment token
+      let decimals = 18;
+      if (selectedEstate.paymentToken !== ethers.constants.AddressZero) {
+        decimals = await paymentToken.decimals();
+      }
+      
+      // Format amount with proper decimals
+      const collateralAmountWei = ethers.utils.parseUnits(depositCollateralAmount, decimals);
+      
+      // If not native token, check approval and approve if needed
+      if (selectedEstate.paymentToken !== ethers.constants.AddressZero) {
+        const allowance = await paymentToken.allowance(walletAddress, selectedEstate.address);
+        
+        if (allowance.lt(collateralAmountWei)) {
+          console.log(`Approving collateral deposit: ${collateralAmountWei.toString()}`);
+          const approveTx = await paymentToken.approve(
+            selectedEstate.address,
+            collateralAmountWei
+          );
+          await approveTx.wait();
+          console.log('Approval transaction complete');
+        }
+      }
+      
+      // Call depositCollateral function
+      let tx;
+      if (selectedEstate.paymentToken === ethers.constants.AddressZero) {
+        // For native token (ETH/AVAX), send value
+        tx = await tokenContract.depositCollateral(collateralAmountWei, { value: collateralAmountWei });
+      } else {
+        tx = await tokenContract.depositCollateral(collateralAmountWei);
+      }
+      
+      await tx.wait();
+      
+      setSuccess(`Successfully deposited ${depositCollateralAmount} ${selectedEstate.paymentTokenSymbol} as collateral!`);
+      setShowDepositCollateralModal(false);
+      setDepositCollateralAmount('');
+      
+      // Refresh data
+      await loadTokenizedEstates(contracts);
+    } catch (error) {
+      console.error('Error depositing collateral:', error);
+      setError(`Error depositing collateral: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleWithdrawCollateral = async (e) => {
+    e.preventDefault();
+    if (!contracts || !selectedEstate) {
+      setError('Contracts not loaded or no estate selected');
+      return;
+    }
+    
+    if (!withdrawCollateralAmount || parseFloat(withdrawCollateralAmount) <= 0) {
+      setError('Please enter a valid amount to withdraw');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      // Create contract instance for the tokenized real estate
+      const tokenContract = new ethers.Contract(
+        selectedEstate.address,
+        TokenizedRealEstateABI,
+        contracts.signer
+      );
+      
+      // Get decimals for the payment token
+      let decimals = 18;
+      if (selectedEstate.paymentToken !== ethers.constants.AddressZero) {
+        const paymentToken = getERC20Contract(selectedEstate.paymentToken, contracts.signer);
+        decimals = await paymentToken.decimals();
+      }
+      
+      // Format amount with proper decimals
+      const collateralAmountWei = ethers.utils.parseUnits(withdrawCollateralAmount, decimals);
+      
+      // Call withdrawCollateral function
+      const tx = await tokenContract.withdrawCollateral(collateralAmountWei);
+      await tx.wait();
+      
+      setSuccess(`Successfully withdrawn ${withdrawCollateralAmount} ${selectedEstate.paymentTokenSymbol} from collateral!`);
+      setShowWithdrawCollateralModal(false);
+      setWithdrawCollateralAmount('');
+      
+      // Refresh data
+      await loadTokenizedEstates(contracts);
+    } catch (error) {
+      console.error('Error withdrawing collateral:', error);
+      setError(`You can't withdraw more than your deposited collateral: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -256,51 +436,95 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         <Row>
           {tokenizedEstates.map((estate, index) => (
             <Col md={6} lg={4} key={index} className="mb-4">
-              <Card>
+              <Card className="h-100 shadow-sm border-0 rounded-3">
                 <Card.Body>
-                  <Card.Title>{estate.name} ({estate.symbol})</Card.Title>
+                  <Card.Title className="d-flex justify-content-between align-items-center">
+                    <span>{estate.name} ({estate.symbol})</span>
+                    <span className="badge bg-light text-dark">ID: {estate.tokenId}</span>
+                  </Card.Title>
+                  <Card.Title className="d-flex flex-column">
+                    <div className="font-monospace badge text-dark">Estate Owner:</div>
+                    <div className="font-monospace badge bg-light text-dark">{estate.estateOwner}</div>
+                  </Card.Title>
                   <Table responsive bordered size="sm">
                     <tbody>
                       <tr>
                         <th>Total Supply</th>
-                        <td>{estate.totalSupply ? ethers.utils.formatEther(estate.totalSupply) : '0'}</td>
+                        <td>{formatTREAmount(estate.totalSupply)} TRE</td>
                       </tr>
                       <tr>
-                        <th>Your Balance</th>
-                        <td>{estate.balance ? ethers.utils.formatEther(estate.balance) : '0'}</td>
+                        <th>Your Current Chain Balance</th>
+                        <td>{formatTREAmount(estate.balance)} TRE</td>
                       </tr>
+                      { estate.allChainsBalance && <tr>
+                        <th>Your Aggregated Chains Balance</th>
+                        <td>{formatTREAmount(estate.allChainsBalance)} TRE</td>
+                      </tr>}
                       <tr>
                         <th>Token Price</th>
-                        <td>{estate.tokenPrice ? ethers.utils.formatEther(estate.tokenPrice) : '0'} ETH</td>
+                        <td>{estate.formattedTokenPrice} {estate.paymentTokenSymbol}</td>
                       </tr>
                       <tr>
                         <th>Available</th>
-                        <td>{estate.tokensAvailable ? ethers.utils.formatEther(estate.tokensAvailable) : '0'}</td>
+                        <td>{formatTREAmount(estate.tokensAvailable)} TRE</td>
+                      </tr>
+                      <tr>
+                        <th>Your Collateral</th>
+                        <td>{estate.formattedCollateral || "0"} {estate.paymentTokenSymbol}</td>
                       </tr>
                     </tbody>
                   </Table>
                   
-                  <div className="d-flex justify-content-between mt-3">
+                  <div className="d-flex flex-wrap justify-content-center gap-2 mt-4">
                     <Button 
-                      variant="success" 
+                      variant="outline-success" 
                       onClick={() => {
                         setSelectedEstate(estate);
                         setShowBuyModal(true);
                       }}
                       disabled={!estate.tokensAvailable || estate.tokensAvailable.isZero()}
+                      className="btn-action"
+                      size="md"
                     >
-                      Buy Tokens
+                      <FontAwesomeIcon icon={faShoppingCart} className="me-1" /> Buy TRE Tokens
                     </Button>
                     
                     <Button 
-                      variant="warning" 
+                      variant="outline-warning" 
                       onClick={() => {
                         setSelectedEstate(estate);
                         setShowSellModal(true);
                       }}
                       disabled={!estate.balance || estate.balance.isZero()}
+                      className="btn-action"
+                      size="md"
                     >
-                      Sell Tokens
+                      <FontAwesomeIcon icon={faTags} className="me-1" /> Sell TRE Tokens
+                    </Button>
+
+                    <Button
+                      variant="outline-info"
+                      onClick={() => {
+                        setSelectedEstate(estate);
+                        setShowDepositCollateralModal(true);
+                      }}
+                      className="btn-action"
+                      size="md"
+                    >
+                      <FontAwesomeIcon icon={faCoins} className="me-1" /> Deposit Collateral
+                    </Button>
+
+                    <Button
+                      variant="outline-secondary"
+                      onClick={() => {
+                        setSelectedEstate(estate);
+                        setShowWithdrawCollateralModal(true);
+                      }}
+                      disabled={!estate.userCollateral || estate.userCollateral.isZero()}
+                      className="btn-action"
+                      size="md"
+                    >
+                      <FontAwesomeIcon icon={faMoneyBillTransfer} className="me-1" /> Withdraw Collateral
                     </Button>
                   </div>
                 </Card.Body>
@@ -310,31 +534,35 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         </Row>
       )}
       
-      <div className="d-flex justify-content-between align-items-center mt-4">
+      <div className="d-flex flex-wrap justify-content-between align-items-center mt-5 mb-3">
         <h2>Network Switcher</h2>
-        <div>
+        <div className="network-switcher">
           <Button 
-            variant={currentChainId === 11155111 ? "primary" : "outline-primary"} 
-            className="me-2"
+            variant={currentChainId === 11155111 ? "dark" : "outline-dark"} 
+            className={`me-2 btn-network ${currentChainId === 11155111 ? 'active' : ''}`}
             onClick={() => handleNetworkSwitch(11155111)}
             disabled={loading || currentChainId === 11155111}
           >
-            Ethereum Sepolia
+            <FontAwesomeIcon icon={faDollarSign} className="me-2" /> Ethereum Sepolia
           </Button>
           <Button 
-            variant={currentChainId === 43113 ? "primary" : "outline-primary"}
+            variant={currentChainId === 43113 ? "dark" : "outline-dark"}
+            className={`btn-network ${currentChainId === 43113 ? 'active' : ''}`}
             onClick={() => handleNetworkSwitch(43113)}
             disabled={loading || currentChainId === 43113}
           >
-            Avalanche Fuji
+            <FontAwesomeIcon icon={faSnowflake} className="me-2" /> Avalanche Fuji
           </Button>
         </div>
       </div>
       
       {/* Buy Modal */}
-      <Modal show={showBuyModal} onHide={() => setShowBuyModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Buy {selectedEstate?.symbol} Tokens</Modal.Title>
+      <Modal show={showBuyModal} onHide={() => setShowBuyModal(false)} centered>
+        <Modal.Header closeButton className="bg-light">
+          <Modal.Title>
+            <FontAwesomeIcon icon={faShoppingCart} className="me-2 text-success" />
+            Buy {selectedEstate?.symbol?.substr(0, 3)} Tokens
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form onSubmit={handleBuyTokens}>
@@ -348,6 +576,7 @@ const UserDashboard = ({ walletAddress, chainId }) => {
                 min="0.000000000000000001"
                 step="0.000000000000000001"
                 required
+                className="form-control-modern"
               />
               <Form.Text className="text-muted">
                 Available: {selectedEstate && selectedEstate.tokensAvailable ? 
@@ -355,23 +584,11 @@ const UserDashboard = ({ walletAddress, chainId }) => {
               </Form.Text>
             </Form.Group>
             
-            <Form.Group className="mb-3">
-              <Form.Label>Total Cost</Form.Label>
-              <Form.Control 
-                type="text" 
-                value={buyAmount && selectedEstate && selectedEstate.tokenPrice ? 
-                  `${parseFloat(buyAmount) * parseFloat(ethers.utils.formatEther(selectedEstate.tokenPrice))} ETH` : 
-                  '0 ETH'
-                } 
-                disabled
-              />
-            </Form.Group>
-            
-            <div className="d-flex justify-content-end">
-              <Button variant="secondary" className="me-2" onClick={() => setShowBuyModal(false)}>
+            <div className="d-flex justify-content-end gap-2">
+              <Button variant="outline-secondary" onClick={() => setShowBuyModal(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" type="submit" disabled={loading}>
+              <Button variant="success" type="submit" disabled={loading} className="px-4">
                 {loading ? <Spinner animation="border" size="sm" /> : 'Buy Tokens'}
               </Button>
             </div>
@@ -380,9 +597,12 @@ const UserDashboard = ({ walletAddress, chainId }) => {
       </Modal>
       
       {/* Sell Modal */}
-      <Modal show={showSellModal} onHide={() => setShowSellModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Sell {selectedEstate?.symbol} Tokens</Modal.Title>
+      <Modal show={showSellModal} onHide={() => setShowSellModal(false)} centered>
+        <Modal.Header closeButton className="bg-light">
+          <Modal.Title>
+            <FontAwesomeIcon icon={faTags} className="me-2 text-warning" />
+            Sell {selectedEstate?.symbol?.substr(0, 3)} Tokens
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form onSubmit={handleSellTokens}>
@@ -396,6 +616,7 @@ const UserDashboard = ({ walletAddress, chainId }) => {
                 min="0.000000000000000001"
                 step="0.000000000000000001"
                 required
+                className="form-control-modern"
               />
               <Form.Text className="text-muted">
                 Your Balance: {selectedEstate && selectedEstate.balance ? 
@@ -403,29 +624,136 @@ const UserDashboard = ({ walletAddress, chainId }) => {
               </Form.Text>
             </Form.Group>
             
-            <Form.Group className="mb-3">
-              <Form.Label>Expected Return</Form.Label>
-              <Form.Control 
-                type="text" 
-                value={sellAmount && selectedEstate && selectedEstate.tokenPrice ? 
-                  `${parseFloat(sellAmount) * parseFloat(ethers.utils.formatEther(selectedEstate.tokenPrice))} ETH` : 
-                  '0 ETH'
-                } 
-                disabled
-              />
-            </Form.Group>
-            
-            <div className="d-flex justify-content-end">
-              <Button variant="secondary" className="me-2" onClick={() => setShowSellModal(false)}>
+            <div className="d-flex justify-content-end gap-2">
+              <Button variant="outline-secondary" onClick={() => setShowSellModal(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" type="submit" disabled={loading}>
+              <Button variant="warning" type="submit" disabled={loading} className="px-4">
                 {loading ? <Spinner animation="border" size="sm" /> : 'Sell Tokens'}
               </Button>
             </div>
           </Form>
         </Modal.Body>
       </Modal>
+
+      {/* Deposit Collateral Modal */}
+      <Modal show={showDepositCollateralModal} onHide={() => setShowDepositCollateralModal(false)} centered>
+        <Modal.Header closeButton className="bg-light">
+          <Modal.Title>
+            <FontAwesomeIcon icon={faCoins} className="me-2 text-info" />
+            Deposit Collateral
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form onSubmit={handleDepositCollateral}>
+            <Form.Group className="mb-3">
+              <Form.Label>Amount to Deposit</Form.Label>
+              <Form.Control 
+                type="number" 
+                placeholder="Enter amount" 
+                value={depositCollateralAmount} 
+                onChange={(e) => setDepositCollateralAmount(e.target.value)}
+                min="0.000000000000000001"
+                step="0.000000000000000001"
+                required
+                className="form-control-modern"
+              />
+              <Form.Text className="text-muted">
+                Payment Token: {selectedEstate?.paymentTokenSymbol || ''}
+              </Form.Text>
+            </Form.Group>
+            
+            <div className="d-flex justify-content-end gap-2">
+              <Button variant="outline-secondary" onClick={() => setShowDepositCollateralModal(false)}>
+                Cancel
+              </Button>
+              <Button variant="info" type="submit" disabled={loading} className="px-4 text-white">
+                {loading ? <Spinner animation="border" size="sm" /> : 'Deposit Collateral'}
+              </Button>
+            </div>
+          </Form>
+        </Modal.Body>
+      </Modal>
+      
+      {/* Withdraw Collateral Modal */}
+      <Modal show={showWithdrawCollateralModal} onHide={() => setShowWithdrawCollateralModal(false)} centered>
+        <Modal.Header closeButton className="bg-light">
+          <Modal.Title>
+            <FontAwesomeIcon icon={faMoneyBillTransfer} className="me-2 text-secondary" />
+            Withdraw Collateral
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form onSubmit={handleWithdrawCollateral}>
+            <Form.Group className="mb-3">
+              <Form.Label>Amount to Withdraw</Form.Label>
+              <Form.Control 
+                type="number" 
+                placeholder="Enter amount" 
+                value={withdrawCollateralAmount} 
+                onChange={(e) => setWithdrawCollateralAmount(e.target.value)}
+                min="0.000000000000000001"
+                step="0.000000000000000001"
+                required
+                className="form-control-modern"
+              />
+              <Form.Text className="text-muted">
+                Your Collateral: {selectedEstate?.formattedCollateral || '0'} {selectedEstate?.paymentTokenSymbol || ''}
+              </Form.Text>
+            </Form.Group>
+            
+            <div className="d-flex justify-content-end gap-2">
+              <Button variant="outline-secondary" onClick={() => setShowWithdrawCollateralModal(false)}>
+                Cancel
+              </Button>
+              <Button variant="secondary" type="submit" disabled={loading} className="px-4">
+                {loading ? <Spinner animation="border" size="sm" /> : 'Withdraw Collateral'}
+              </Button>
+            </div>
+          </Form>
+        </Modal.Body>
+      </Modal>
+
+      <style jsx="true">{`
+        .btn-action {
+          min-width: 110px;
+          border-radius: 8px;
+          font-weight: 500;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .btn-action:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .btn-network {
+          min-width: 180px;
+          border-radius: 20px;
+          font-weight: 500;
+          transition: all 0.3s ease;
+        }
+        .btn-network.active {
+          box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .btn-network:hover:not(:disabled) {
+          transform: translateY(-2px);
+        }
+        .form-control-modern {
+          border-radius: 8px;
+          border: 1px solid #ced4da;
+          padding: 10px 15px;
+        }
+        .network-switcher {
+          margin-top: 10px;
+        }
+        .card {
+          transition: all 0.3s ease;
+        }
+        .card:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+        }
+      `}</style>
     </div>
   );
 };

@@ -144,7 +144,7 @@ const Home = ({ walletAddress, connectWalletPressed, setRole, role }) => {
     }
     
     setRole('user');
-    navigate('/user');
+    navigate('/dashboard/user');
   };
 
   const renderForm = () => {
