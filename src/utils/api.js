@@ -337,6 +337,16 @@ export const updateNodeOperatorAutoUpdate = async (nodeId, autoUpdateEnabled) =>
   }
 };
 
+export const updateNodeOperatorClaimedRewards = async (nodeId, claimedRewards) => {
+  try {
+    const response = await api.patch(`/node/update-node/${nodeId}`, { claimedRewards });
+    return response.data;
+  } catch (error) {
+    console.error('Update claimed rewards error:', error);
+    throw error;
+  }
+}
+
 export const getAllNodeOperators = async () => {
   try {
     const response = await api.get('/admin/nodes');
@@ -381,6 +391,10 @@ export const checkNodeOperatorExists = async (walletAddress) => {
 export const getNodeOperatorByWalletAddress = async (walletAddress) => {
   try {
     const response = await api.get(`/node/check/${ethers.utils.getAddress(walletAddress)}`);
+    if (response.data.exists === false) {
+      const newResponse = await api.get(`/node/check/${walletAddress}`);
+      return newResponse.data;
+    }
     return response.data;
   } catch (error) {
     console.error('Failed to get node operator by wallet address:', error);

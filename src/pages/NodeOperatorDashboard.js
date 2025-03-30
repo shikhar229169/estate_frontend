@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Tab, Tabs, Card, Form, Button, Table, Alert, Spinner, Modal } from 'react-bootstrap';
 import { ethers } from 'ethers';
 import { getContracts, switchNetwork } from '../utils/interact';
-import { getEstateOwnersByNodeOperator, updateEstateOwnerByNode, getNodeOperatorByWalletAddress, updateNodeOperatorAutoUpdate } from '../utils/api';
+import { getEstateOwnersByNodeOperator, updateEstateOwnerByNode, getNodeOperatorByWalletAddress, updateNodeOperatorAutoUpdate, updateNodeOperatorClaimedRewards } from '../utils/api';
 import VerifyingOperatorVaultABI from '../contracts/abi/VerifyingOperatorVault';
 
 const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
@@ -19,14 +19,14 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
   const [tokenSymbol, setTokenSymbol] = useState(''); // For storing the token symbol
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(false); // New state for auto update
   const [nodeOperatorId, setNodeOperatorId] = useState(null); // Add state for node operator ID
-  
+
   // Form states for various node operator functions
   const [registerVaultForm, setRegisterVaultForm] = useState({
     ensName: '',
     collateralAmount: '10',
     collateralToken: ''
   });
-  
+
   const [verifyEstateOwnerForm, setVerifyEstateOwnerForm] = useState({
     estateOwnerId: '',
     estateOwnerAddress: '',
@@ -34,7 +34,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
     tokenizationPercentage: '',
     token: ''
   });
-  
+
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedEstateOwner, setSelectedEstateOwner] = useState(null);
 
@@ -42,27 +42,28 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
     const loadContracts = async () => {
       try {
         setLoading(true);
-        
+
         if (walletAddress) {
           // Get contracts
           const contractInstances = getContracts(chainId);
           setContracts(contractInstances);
-          
+
           // Try to get node operator info
           try {
             const nodeInfo = await contractInstances.realEstateRegistry.getOperatorInfo(walletAddress);
             const operatorVaultAddress = await contractInstances.realEstateRegistry.getOperatorVault(walletAddress);
             const operatorVault = new ethers.Contract(operatorVaultAddress, VerifyingOperatorVaultABI, contractInstances.signer);
             const aue = await operatorVault.isAutoUpdateEnabled()
+            const claimableRewards = await operatorVault.getRewards();
+            let claimedRewards = "0";
 
             // If vault address is not zero, operator is registered
             if (nodeInfo && nodeInfo.vaultAddress !== ethers.constants.AddressZero) {
               setIsRegistered(true);
-              setNodeOperatorInfo(nodeInfo);
               setNodeOperatorEns(nodeInfo.ensName);
               setAutoUpdateEnabled(aue); // Set auto update status
               console.log('Node operator info:', nodeInfo);
-              
+
               // Also fetch info from backend
               try {
                 const backendInfo = await getNodeOperatorByWalletAddress(walletAddress);
@@ -72,11 +73,14 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                   //   ...nodeInfo,
                   //   ...backendInfo.data
                   // });
+                  claimedRewards = backendInfo.data.claimedRewards || "0";
                   setNodeOperatorId(backendInfo.data.id); // Store the node operator ID
                 }
               } catch (error) {
                 console.error('Error fetching backend operator info:', error);
               }
+
+              setNodeOperatorInfo({ ...nodeInfo, claimableRewards, claimedRewards });
             } else {
               setIsRegistered(false);
               console.log('Not registered as a node operator');
@@ -85,14 +89,14 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
             console.error('Error loading node operator info:', error);
           }
         }
-        
+
         setLoading(false);
       } catch (error) {
         console.error('Error:', error);
         setLoading(false);
       }
     };
-    
+
     loadContracts();
   }, [walletAddress, chainId]);
 
@@ -112,7 +116,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
         }
       }
     };
-    
+
     loadEstateOwners();
   }, [nodeOperatorEns]);
 
@@ -166,7 +170,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
   const formatTokenAmount = (amount) => {
     if (!amount) return '0';
     try {
-      const ethersFormattedAmount =  ethers.utils.formatUnits(amount, tokenDecimals);
+      const ethersFormattedAmount = ethers.utils.formatUnits(amount, tokenDecimals);
       return ethersFormattedAmount.includes('.') ? ethersFormattedAmount.split('.')[0] + '.' + ethersFormattedAmount.split('.')[1].slice(0, 4) : ethersFormattedAmount;
     } catch (error) {
       console.error('Error formatting token amount:', error);
@@ -185,11 +189,11 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
       setError('Contracts not loaded');
       return;
     }
-    
+
     setLoading(true);
     setError('');
     setSuccess('');
-    
+
     try {
       // First approve collateral token if needed
       if (registerVaultForm.collateralToken !== ethers.constants.AddressZero) {
@@ -198,29 +202,29 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
           ['function approve(address spender, uint256 amount) public returns (bool)'],
           contracts.signer
         );
-        
+
         const approveTx = await erc20.approve(
           contracts.realEstateRegistry.address,
           ethers.utils.parseEther(registerVaultForm.collateralAmount)
         );
-        
+
         await approveTx.wait();
       }
-      
+
       // Register vault
       const tx = await contracts.realEstateRegistry.registerOperatorVault(
         registerVaultForm.ensName,
         {
-          value: registerVaultForm.collateralToken === ethers.constants.AddressZero 
-            ? ethers.utils.parseEther(registerVaultForm.collateralAmount) 
+          value: registerVaultForm.collateralToken === ethers.constants.AddressZero
+            ? ethers.utils.parseEther(registerVaultForm.collateralAmount)
             : 0
         }
       );
-      
+
       await tx.wait();
       setSuccess('Operator vault registered successfully!');
       setNodeOperatorEns(registerVaultForm.ensName);
-      
+
       // Reset form
       setRegisterVaultForm({
         ensName: '',
@@ -243,22 +247,22 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
       tokenizationPercentage: estateOwner.percentageToTokenize,
       token: estateOwner.token || ethers.constants.AddressZero
     });
-    
+
     setActiveTab('verifyEstateOwner');
   };
 
   const handleVerifyEstateOwner = async (e) => {
-    e.preventDefault();    
+    e.preventDefault();
     if (!contracts || !contracts.estateVerification) {
       setError('Estate Verification contract not loaded');
       return;
     }
-    
+
     setLoading(true);
     setError('');
     setSuccess('');
-    
-    try {      
+
+    try {
       const _request = {
         estateOwner: verifyEstateOwnerForm.estateOwnerAddress,
         chainsToDeploy: [43113, 11155111],
@@ -281,14 +285,14 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
         _request,
         _response
       );
-      
+
       await tx.wait();
-      
+
       // Update estate owner status in backend using _id
       await updateEstateOwnerByNode(verifyEstateOwnerForm.estateOwnerId);
-      
+
       setSuccess('Estate owner verified successfully!');
-      
+
       // Reset form
       setVerifyEstateOwnerForm({
         estateOwnerId: '',
@@ -297,7 +301,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
         tokenizationPercentage: '',
         token: ''
       });
-      
+
       // Refresh estate owners list
       const estateOwners = await getEstateOwnersByNodeOperator(nodeOperatorEns);
       setEstateOwners(estateOwners || []);
@@ -313,6 +317,39 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
     setShowDetailsModal(true);
   };
 
+  const handleClaimRewards = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      // Get the operator vault address
+      const operatorVaultAddress = await contracts.realEstateRegistry.getOperatorVault(walletAddress);
+      const operatorVault = new ethers.Contract(operatorVaultAddress, VerifyingOperatorVaultABI, contracts.signer);
+
+      const latestClaimableRewards = await operatorVault.getRewards();
+
+      // Claim Rewards
+      const tx = await operatorVault.claimRewardFromStaking();
+      await tx.wait();
+
+      const claimedRewards = (ethers.BigNumber.from(nodeOperatorInfo.claimedRewards || "0")).add(latestClaimableRewards);
+      const claimableRewards = ethers.BigNumber.from(0);
+
+      // Update local state
+      setNodeOperatorInfo({...nodeOperatorInfo, claimableRewards: claimableRewards, claimedRewards: claimedRewards.toString()});
+
+      // Update backend state
+      await updateNodeOperatorClaimedRewards(nodeOperatorId, claimedRewards.toString());
+
+      setSuccess('Rewards Claimed successfully!');
+    } catch (error) {
+      console.error('Error claiming Rewards:', error);
+      setError('');
+      setSuccess('No Rewards to Claim.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   const handleToggleAutoUpdate = async () => {
     try {
       setLoading(true);
@@ -320,18 +357,18 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
       // Get the operator vault address
       const operatorVaultAddress = await contracts.realEstateRegistry.getOperatorVault(walletAddress);
       const operatorVault = new ethers.Contract(operatorVaultAddress, VerifyingOperatorVaultABI, contracts.signer);
-      
+
       // Toggle auto update on the vault
       const tx = await operatorVault.toggleAutoUpdate();
       await tx.wait();
-      
+
       // Update local state
       const newAutoUpdateStatus = !autoUpdateEnabled;
       setAutoUpdateEnabled(newAutoUpdateStatus);
-      
+
       // Update backend state
       await updateNodeOperatorAutoUpdate(nodeOperatorId, newAutoUpdateStatus);
-      
+
       setSuccess('Auto update setting has been toggled successfully');
     } catch (error) {
       console.error('Error toggling auto update:', error);
@@ -340,7 +377,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
       setLoading(false);
     }
   };
-
+  
   const handleForceUpgrade = async () => {
     try {
       setLoading(true);
@@ -353,7 +390,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
       
       setSuccess('Vault has been force upgraded successfully');
     } catch (error) {
-
+      
       if (error.error.data.data === "0x3e924efb") {
         setSuccess('Vault is already up to date');
       }
@@ -379,14 +416,14 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
       <div className="text-center">
         <h2>Please connect to a supported network</h2>
         <div className="mt-4">
-          <Button 
-            variant="primary" 
+          <Button
+            variant="primary"
             className="me-2"
             onClick={() => switchNetwork(43113)}
           >
             Switch to Fuji
           </Button>
-          <Button 
+          <Button
             variant="primary"
             onClick={() => switchNetwork(11155111)}
           >
@@ -402,8 +439,8 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
       <div className="text-center">
         <h2>You are not registered as a node operator.</h2>
         <p>Please sign up first.</p>
-        <Button 
-          variant="primary" 
+        <Button
+          variant="primary"
           onClick={() => window.location.href = '/node-operator-signup'}
         >
           Sign Up as Node Operator
@@ -415,10 +452,10 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
   return (
     <div className="node-operator-dashboard">
       <h2 className="mb-4">Node Operator Dashboard</h2>
-      
+
       {error && <Alert variant="danger">{error}</Alert>}
       {success && <Alert variant="success">{success}</Alert>}
-      
+
       {loading && (
         <div className="text-center mb-4">
           <Spinner animation="border" role="status">
@@ -426,7 +463,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
           </Spinner>
         </div>
       )}
-      
+
       {!nodeOperatorInfo && (
         <Card className="mb-4">
           <Card.Body>
@@ -443,7 +480,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                   required
                 />
               </Form.Group>
-              
+
               <Form.Group className="mb-3">
                 <Form.Label>Collateral Amount</Form.Label>
                 <Form.Control
@@ -455,7 +492,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                   required
                 />
               </Form.Group>
-              
+
               <Form.Group className="mb-3">
                 <Form.Label>Collateral Token</Form.Label>
                 <Form.Control
@@ -469,7 +506,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                   Leave empty to use native token (ETH/AVAX)
                 </Form.Text>
               </Form.Group>
-              
+
               <Button variant="primary" type="submit" disabled={loading}>
                 Register Vault
               </Button>
@@ -477,7 +514,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
           </Card.Body>
         </Card>
       )}
-      
+
       {nodeOperatorInfo && (
         <>
           <Card className="mb-4">
@@ -496,8 +533,8 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                   <tr>
                     <th>Collateral Token</th>
                     <td>
-                      {nodeOperatorInfo.token === ethers.constants.AddressZero ? 
-                        `Native ${tokenSymbol}` : 
+                      {nodeOperatorInfo.token === ethers.constants.AddressZero ?
+                        `Native ${tokenSymbol}` :
                         `${tokenSymbol} (${nodeOperatorInfo.token})`
                       }
                     </td>
@@ -505,8 +542,8 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                   <tr>
                     <th>Collateral Amount</th>
                     <td>
-                      {nodeOperatorInfo.stakedCollateralInToken ? 
-                        `${formatTokenAmount(nodeOperatorInfo.stakedCollateralInToken)} ${tokenSymbol}` 
+                      {nodeOperatorInfo.stakedCollateralInToken ?
+                        `${formatTokenAmount(nodeOperatorInfo.stakedCollateralInToken)} ${tokenSymbol}`
                         : 'Loading...'
                       }
                     </td>
@@ -514,6 +551,25 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                   <tr>
                     <th>Status</th>
                     <td>{nodeOperatorInfo.isApproved ? 'Approved' : 'Pending Approval'}</td>
+                  </tr>
+                  <tr>
+                    <th>Claimable Rewards</th>
+                    <td>
+                      {formatTokenAmount(nodeOperatorInfo.claimableRewards)} {tokenSymbol}
+                      <Button
+                        variant={nodeOperatorInfo.claimableRewards.isZero() ? "warning" : "success"}
+                        size="sm"
+                        className="ms-2"
+                        onClick={handleClaimRewards}
+                        disabled={loading /*|| nodeOperatorInfo.claimableRewards.isZero()*/}
+                      >
+                        Claim Rewards
+                      </Button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>Claimed Rewards</th>
+                    <td>{formatTokenAmount(nodeOperatorInfo.claimedRewards)} {tokenSymbol}</td>
                   </tr>
                   <tr>
                     <th>Auto Update</th>
@@ -545,7 +601,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
               </Table>
             </Card.Body>
           </Card>
-          
+
           <Tabs
             activeKey={activeTab}
             onSelect={(k) => setActiveTab(k)}
@@ -577,18 +633,18 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                           <td>{owner.percentageToTokenize}%</td>
                           <td>{owner.isVerified ? 'Verified' : (owner.isRejected ? 'Rejected' : 'Pending')}</td>
                           <td>
-                            <Button 
-                              variant="info" 
+                            <Button
+                              variant="info"
                               size="sm"
                               className="me-2"
                               onClick={() => handleViewDetails(owner)}
                             >
                               Details
                             </Button>
-                            
+
                             {!owner.isVerified && (
-                              <Button 
-                                variant="success" 
+                              <Button
+                                variant="success"
                                 size="sm"
                                 onClick={() => handleVerifyFromList(owner)}
                               >
@@ -608,12 +664,12 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                 </Card.Body>
               </Card>
             </Tab>
-            
+
             <Tab eventKey="verifyEstateOwner" title="Verify Estate Owner">
               <Card>
                 <Card.Body>
                   <h4>Verify Estate Owner</h4>
-                  <Form 
+                  <Form
                     onSubmit={(e) => {
                       handleVerifyEstateOwner(e);
                     }}
@@ -629,7 +685,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                         required
                       />
                     </Form.Group>
-                    
+
                     <Form.Group className="mb-3">
                       <Form.Label>Estate Value</Form.Label>
                       <Form.Control
@@ -649,7 +705,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                         Value in {tokenSymbol}
                       </Form.Text>
                     </Form.Group>
-                    
+
                     <Form.Group className="mb-3">
                       <Form.Label>Tokenization Percentage</Form.Label>
                       <Form.Control
@@ -662,7 +718,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                         required
                       />
                     </Form.Group>
-                    
+
                     <Form.Group className="mb-3">
                       <Form.Label>Token</Form.Label>
                       <Form.Control
@@ -674,11 +730,11 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                         required
                       />
                     </Form.Group>
-                    
+
                     <Button variant="primary" type="submit" disabled={loading || !nodeOperatorInfo?.isApproved}>
                       Verify Estate Owner
                     </Button>
-                    
+
                     {!nodeOperatorInfo?.isApproved && (
                       <Form.Text className="text-danger">
                         Your operator vault must be approved by an admin before you can verify estate owners.
@@ -691,7 +747,7 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
           </Tabs>
         </>
       )}
-      
+
       {/* Estate Owner Details Modal */}
       <Modal show={showDetailsModal} onHide={() => setShowDetailsModal(false)} size="lg">
         <Modal.Header closeButton>
@@ -745,25 +801,25 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
                   </tr>
                 </tbody>
               </Table>
-              
+
               <div className="mt-3">
                 <h6>KYC Document</h6>
                 {selectedEstateOwner.kycDocumentImage ? (
-                  <img 
-                    src={selectedEstateOwner.kycDocumentImage} 
-                    alt="KYC Document" 
+                  <img
+                    src={selectedEstateOwner.kycDocumentImage}
+                    alt="KYC Document"
                     className="img-fluid mb-3"
                     style={{ maxHeight: '200px' }}
                   />
                 ) : (
                   <p>No KYC document image available</p>
                 )}
-                
+
                 <h6>Ownership Document</h6>
                 {selectedEstateOwner.ownershipDocumentImage ? (
-                  <img 
-                    src={selectedEstateOwner.ownershipDocumentImage} 
-                    alt="Ownership Document" 
+                  <img
+                    src={selectedEstateOwner.ownershipDocumentImage}
+                    alt="Ownership Document"
                     className="img-fluid"
                     style={{ maxHeight: '200px' }}
                   />
@@ -778,10 +834,10 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
           <Button variant="secondary" onClick={() => setShowDetailsModal(false)}>
             Close
           </Button>
-          
+
           {selectedEstateOwner && !selectedEstateOwner.isVerified && (
-            <Button 
-              variant="success" 
+            <Button
+              variant="success"
               onClick={() => {
                 handleVerifyFromList(selectedEstateOwner);
                 setShowDetailsModal(false);
