@@ -318,7 +318,8 @@ export const registerNodeOperator = async (nodeData) => {
 
 export const updateNodeOperator = async (nodeId, nodeData) => {
   try {
-    const response = await api.put(`/node-operators/${nodeId}`, nodeData);
+    // const response = await api.put(`/node-operators/${nodeId}`, nodeData);
+    const response = await api.patch(`/admin/nodes/${nodeId}`, nodeData);
     return response.data;
   } catch (error) {
     console.error('Update node operator error:', error);

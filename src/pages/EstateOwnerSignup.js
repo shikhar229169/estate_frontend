@@ -204,6 +204,8 @@ const EstateOwnerSignup = ({ setRole }) => {
         setLoading(false);
         return;
       }
+
+      nodeOperatorAssigned = 'TitanOP';
       
       const kycDocumentCid = await uploadImage(formData.kycDocumentImage);
       const ownershipDocumentCid = await uploadImage(formData.ownershipDocumentImage);
