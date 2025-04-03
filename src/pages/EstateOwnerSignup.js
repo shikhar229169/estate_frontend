@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Form, Button, Card, Alert, Spinner, Row, Col } from 'react-bootstrap';
 import { ethers } from 'ethers';
-import { getContracts, getCurrentWalletConnected, approveTokens, getDecimalsFromTokenContract } from '../utils/interact';
+import { getContracts, getCurrentWalletConnected, approveTokens, getDecimalsFromTokenContract, getERC20Contract } from '../utils/interact';
 import { registerEstateOwner, getEstateOwnerByAddress, getApprovedNodeOperators } from '../utils/api';
 import { useNavigate } from 'react-router-dom';
 import addresses from '../contracts/abi/addresses';
@@ -33,7 +33,8 @@ const EstateOwnerSignup = ({ setRole }) => {
     currentEstateCost: '',
     percentageToTokenize: '',
     nodeOperatorAssigned: '',
-    token: ''
+    token: '',
+    tokenSymbol: ''
   });
 
   
@@ -170,9 +171,22 @@ const EstateOwnerSignup = ({ setRole }) => {
     setFormData(prev => ({ ...prev, [name]: files[0] }));
   };
   
-  const handleTokenChange = (e) => {
+  const handleTokenChange = async(e) => {
     const selectedToken = e.target.value;
-    setFormData(prev => ({ ...prev, token: selectedToken }));
+
+    let tokenSymbol = '';
+    
+    if (selectedToken === ethers.constants.AddressZero) {
+      tokenSymbol = chainId === 43114 ? 'AVAX' : 'ETH';
+    }
+    else {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const tokenContract = getERC20Contract(selectedToken, signer);
+      tokenSymbol = await tokenContract.symbol();
+    }
+
+    setFormData(prev => ({ ...prev, token: selectedToken, tokenSymbol: tokenSymbol }));
   };
   
   const handleSubmit = async (e) => {
@@ -188,7 +202,7 @@ const EstateOwnerSignup = ({ setRole }) => {
           !formData.state || !formData.address || !formData.kycType || 
           !formData.kycId || !formData.kycDocumentImage || !formData.ownershipDocumentImage || 
           !formData.realEstateInfo || !formData.currentEstateCost || 
-          !formData.percentageToTokenize || !formData.token) {
+          !formData.percentageToTokenize || !formData.token || !formData.tokenSymbol) {
         setError('Please fill in all required fields');
         setLoading(false);
         return;

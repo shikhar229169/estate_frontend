@@ -25,6 +25,7 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
   const [showRewardsModal, setShowRewardsModal] = useState(false);
   const [newEstateCost, setNewEstateCost] = useState('');
   const [estateRewards, setEstateRewards] = useState('');
+  const [collateralCollected, setCollateralCollected] = useState(0);
 
   useEffect(() => {
     const loadContracts = async () => {
@@ -56,8 +57,6 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
                 const tokenSupply = await tokenContract.totalSupply();
                 const tokenPrice = await tokenContract.getPerEstateTokenPrice();
                 const decimals = await tokenContract.decimals();
-
-                console.log("<MEEEEOW:", tokenSupply);
 
                 setTokenizationDetails({
                   tokenAddress: tokenizedRealEstate,
@@ -118,6 +117,7 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
                 setTokenSymbol(symbol);
                 setTokenContractAddr(estateOwner.token);
                 setTokenDecimals(decimals);
+                setCollateralCollected(estateOwner.collateralDeposited);
               }
 
               // Format estate cost based on token decimals
@@ -463,6 +463,12 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
                       <td>{tokenizationDetails.tokenAddress}</td>
                     </tr>
                     <tr>
+                      <th>Token Mintable</th>
+                      <td>
+                        1000000 TRE
+                      </td>
+                    </tr>
+                    <tr>
                       <th>Token Supply</th>
                       <td>
                         {tokenizationDetails.tokenSupply && tokenizationDetails.decimals ?
@@ -477,28 +483,9 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
                       </td>
                     </tr>
                     <tr>
-                      <th>Initial Sale Percentage</th>
-                      <td>{tokenizationDetails.initialSalePercentage ? `${tokenizationDetails.initialSalePercentage}%` : 'N/A'}</td>
-                    </tr>
-                    <tr>
-                      <th>Tokens Sold</th>
+                      <th>Total Collateral Collected</th>
                       <td>
-                        {tokenizationDetails.tokensSold && tokenizationDetails.decimals ?
-                          ethers.utils.formatUnits(tokenizationDetails.tokensSold, tokenizationDetails.decimals) : 'N/A'} {tokenizationDetails.tokenSymbol || ''}
-                      </td>
-                    </tr>
-                    <tr>
-                      <th>Funds Raised</th>
-                      <td>
-                        {tokenizationDetails.fundsRaised && tokenizationDetails.decimals ?
-                          `$${ethers.utils.formatUnits(tokenizationDetails.fundsRaised, tokenizationDetails.decimals)}` : 'N/A'}
-                      </td>
-                    </tr>
-                    <tr>
-                      <th>Funds Withdrawn</th>
-                      <td>
-                        {tokenizationDetails.fundsWithdrawn && tokenizationDetails.decimals ?
-                          `$${ethers.utils.formatUnits(tokenizationDetails.fundsWithdrawn, tokenizationDetails.decimals)}` : 'N/A'}
+                        {collateralCollected} {tokenSymbol}
                       </td>
                     </tr>
                   </tbody>

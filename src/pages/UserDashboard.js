@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Table, Alert, Spinner, Form, Row, Col, Modal } from 'react-bootstrap';
 import { ethers } from 'ethers';
 import { getContracts, switchNetwork, getAllTokenizedRealEstates, getERC20Contract } from '../utils/interact';
-import { getEstateOwnerByAddress } from '../utils/api'; // Import the function to get estate owner details
+import { getEstateOwnerByAddress, updateCollateral } from '../utils/api'; // Import the function to get estate owner details
 import TokenizedRealEstateABI from '../contracts/abi/TokenizedRealEstate';
 // Import FontAwesome icons
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -339,6 +339,8 @@ const UserDashboard = ({ walletAddress, chainId }) => {
 
       await tx.wait();
 
+      await updateCollateral(selectedEstate.estateOwner, 'deposit', depositCollateralAmount);
+
       setSuccess(`Successfully deposited ${depositCollateralAmount} ${selectedEstate.paymentTokenSymbol} as collateral!`);
       setShowDepositCollateralModal(false);
       setDepositCollateralAmount('');
@@ -390,6 +392,8 @@ const UserDashboard = ({ walletAddress, chainId }) => {
       // Call withdrawCollateral function
       const tx = await tokenContract.withdrawCollateral(collateralAmountWei);
       await tx.wait();
+
+      await updateCollateral(selectedEstate.estateOwner, 'withdraw', withdrawCollateralAmount);
 
       setSuccess(`Successfully withdrawn ${withdrawCollateralAmount} ${selectedEstate.paymentTokenSymbol} from collateral!`);
       setShowWithdrawCollateralModal(false);

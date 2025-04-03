@@ -443,6 +443,25 @@ export const getEstateOwnerByAddress = async (ethAddress) => {
   }
 };
 
+export const updateCollateral = async (ethAddress, updateType, collateralChange) => {
+  try {
+    if (updateType === 'deposit') {
+      const bodyData = { collateralDeposited: collateralChange };
+      const response = await api.patch(`/user/addCollateralOnEstateOwner/${ethAddress}`, bodyData, { headers: { 'x-api-key': 123 } });
+      return response.data;
+    }
+    else {
+      const bodyData = { collateralWithdrawn: collateralChange };
+      const response = await api.patch(`/user/subtractCollateralOnEstateOwner/${ethAddress}`, bodyData, { headers: { 'x-api-key': 123 } });
+      return response.data;
+    }
+  }
+  catch (error) {
+    console.error('Error updating collateral:', error);
+    throw error;
+  }
+}
+
 export const getEstateOwnersByNodeOperator = async (nodeOperatorEns) => {
   try {
     const response = await api.get(`/node/filtered-users?nodeOperatorAssigned=${nodeOperatorEns}`);
