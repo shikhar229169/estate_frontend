@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Table, Alert, Spinner, Form, Row, Col, Modal } from 'react-bootstrap';
 import { ethers } from 'ethers';
 import { getContracts, switchNetwork, getAllTokenizedRealEstates, getERC20Contract } from '../utils/interact';
-import { getEstateOwnerByAddress, updateCollateral } from '../utils/api'; // Import the function to get estate owner details
+import { getEstateOwnerByAddress, updateCollateral, upsertTokenizedPositionData } from '../utils/api'; // Import the function to get estate owner details
 import TokenizedRealEstateABI from '../contracts/abi/TokenizedRealEstate';
 // Import FontAwesome icons
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -115,10 +115,15 @@ const UserDashboard = ({ walletAddress, chainId }) => {
           // Load user's collateral for this estate
           try {
             const userCollateralAmount = await tokenContract.getCollateralDepositedBy(walletAddress);
+            const userClaimedRewards = await tokenContract.getClaimedRewards();
+            const userClaimableRewards = await tokenContract.getClaimableRewards();
+
             estate.userCollateral = userCollateralAmount;
 
             // Format user collateral based on payment token decimals
             const formattedCollateral = await formatTokenAmount(userCollateralAmount, estate.paymentToken, contractInstances.signer);
+            const formattedClaimedRewards = await formatTokenAmount(userClaimedRewards, estate.paymentToken, contractInstances.signer);
+            const formattedClaimableRewards = await formatTokenAmount(userClaimableRewards, estate.paymentToken, contractInstances.signer);
 
             if (chainId === 43113) {
               const allChainsBalance = await tokenContract.balanceOf(walletAddress);
@@ -126,6 +131,8 @@ const UserDashboard = ({ walletAddress, chainId }) => {
             }
 
             estate.formattedCollateral = formattedCollateral;
+            estate.claimedRewards = formattedClaimedRewards;
+            estate.claimableRewards = formattedClaimableRewards;
           } catch (error) {
             console.error(`Error fetching collateral for ${estate.address}:`, error);
             estate.userCollateral = ethers.BigNumber.from(0);
@@ -178,6 +185,14 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         contracts.signer
       );
 
+      const backendUpdateData = {
+        userAddress: walletAddress,
+        tokenizedRealEstateAddress: selectedEstate.address,
+        paymentToken: selectedEstate.paymentToken,
+        paymentTokenSymbol: selectedEstate.paymentTokenSymbol,
+        treMinted: Number(formatTREAmount(selectedEstate.balance)) + Number(buyAmount)
+      }
+
       // Buy tokens
       if (chainId === 43113) {
         const tx = await tokenContract.buyRealEstatePartialOwnershipWithCollateral(
@@ -197,6 +212,8 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         await tx.wait();
         setSuccess(`Cross Chain Purchase Request Placed ${buyAmount} ${selectedEstate.symbol} tokens!`);
       }
+
+      await upsertTokenizedPositionData(backendUpdateData);
 
       setShowBuyModal(false);
       setBuyAmount('');
@@ -245,7 +262,15 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         contracts.signer
       );
 
-      // Buy tokens
+      const backendUpdateData = {
+        userAddress: walletAddress,
+        tokenizedRealEstateAddress: selectedEstate.address,
+        paymentToken: selectedEstate.paymentToken,
+        paymentTokenSymbol: selectedEstate.paymentTokenSymbol,
+        treMinted: Number(formatTREAmount(selectedEstate.balance)) - Number(sellAmount)
+      }
+
+      // Sell tokens
       if (chainId === 43113) {
         const tx = await tokenContract.burnEstateOwnershipTokens(
           sellAmountWei
@@ -263,6 +288,8 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         await tx.wait();
         setSuccess(`Cross Chain Sell Request Placed ${sellAmount} ${selectedEstate.symbol} tokens!`);
       }
+
+      await upsertTokenizedPositionData(backendUpdateData);
 
       setShowSellModal(false);
       setSellAmount('');
@@ -328,6 +355,14 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         }
       }
 
+      const backendUpdateData = {
+        userAddress: walletAddress,
+        tokenizedRealEstateAddress: selectedEstate.address,
+        paymentToken: selectedEstate.paymentToken,
+        paymentTokenSymbol: selectedEstate.paymentTokenSymbol,
+        collateralDeposited: Number(depositCollateralAmount) + Number(selectedEstate.formattedCollateral)
+      }
+
       // Call depositCollateral function
       let tx;
       if (selectedEstate.paymentToken === ethers.constants.AddressZero) {
@@ -340,6 +375,7 @@ const UserDashboard = ({ walletAddress, chainId }) => {
       await tx.wait();
 
       await updateCollateral(selectedEstate.estateOwner, 'deposit', depositCollateralAmount);
+      await upsertTokenizedPositionData(backendUpdateData);
 
       setSuccess(`Successfully deposited ${depositCollateralAmount} ${selectedEstate.paymentTokenSymbol} as collateral!`);
       setShowDepositCollateralModal(false);
@@ -389,11 +425,20 @@ const UserDashboard = ({ walletAddress, chainId }) => {
       // Format amount with proper decimals
       const collateralAmountWei = ethers.utils.parseUnits(withdrawCollateralAmount, decimals);
 
+      const backendUpdateData = {
+        userAddress: walletAddress,
+        tokenizedRealEstateAddress: selectedEstate.address,
+        paymentToken: selectedEstate.paymentToken,
+        paymentTokenSymbol: selectedEstate.paymentTokenSymbol,
+        collateralDeposited: Number(selectedEstate.formattedCollateral) - Number(withdrawCollateralAmount)
+      }
+
       // Call withdrawCollateral function
       const tx = await tokenContract.withdrawCollateral(collateralAmountWei);
       await tx.wait();
 
       await updateCollateral(selectedEstate.estateOwner, 'withdraw', withdrawCollateralAmount);
+      await upsertTokenizedPositionData(backendUpdateData);
 
       setSuccess(`Successfully withdrawn ${withdrawCollateralAmount} ${selectedEstate.paymentTokenSymbol} from collateral!`);
       setShowWithdrawCollateralModal(false);
@@ -432,6 +477,19 @@ const UserDashboard = ({ walletAddress, chainId }) => {
       const tx = await tokenContract.claimRewardsForEstateOwnershipTokens();
       await tx.wait();
 
+      const rewardsCollected = await tokenContract.getClaimedRewards();
+      const formmatedRewardsCollected = await formatTokenAmount(rewardsCollected, selectedEstate.paymentToken);
+
+      const backendUpdateData = {
+        userAddress: walletAddress,
+        tokenizedRealEstateAddress: selectedEstate.address,
+        paymentToken: selectedEstate.paymentToken,
+        paymentTokenSymbol: selectedEstate.paymentTokenSymbol,
+        rewardsCollected: Number(formmatedRewardsCollected)
+      }
+
+      await upsertTokenizedPositionData(backendUpdateData);
+
       setSuccess(`Successfully Claimed Tokens`);
       setShowRewardModal(false);
 
@@ -454,7 +512,7 @@ const UserDashboard = ({ walletAddress, chainId }) => {
 
       const tre = new ethers.Contract(selectedEstate.address, TokenizedRealEstateABI, contracts.signer);
       const paymentToken = await tre.getPaymentToken();
-      
+
       const estateCost = chainId === 43113 ? await formatTokenAmount(estateDetails.currentEstateCost, estateDetails.token, contracts.signer) : "";
       const rewards = chainId === 43113 ? await formatTokenAmount(estateDetails.rewards, estateDetails.token, contracts.signer) : "";
       setEstateOwnerDetails({ ...estateDetails, currentEstateCost: estateCost, rewards: rewards, token: paymentToken });

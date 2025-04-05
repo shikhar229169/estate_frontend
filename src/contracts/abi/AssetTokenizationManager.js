@@ -192,39 +192,6 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "getAllChainDeploymentAddr",
-    "inputs": [
-      {
-        "name": "_estateOwner",
-        "type": "address[]",
-        "internalType": "address[]"
-      },
-      { "name": "_estateCost", "type": "uint256", "internalType": "uint256" },
-      {
-        "name": "_percentageToTokenize",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      { "name": "_tokenId", "type": "uint256", "internalType": "uint256" },
-      { "name": "_salt", "type": "bytes32", "internalType": "bytes32" },
-      {
-        "name": "_paymentToken",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_chainsToDeploy",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      }
-    ],
-    "outputs": [
-      { "name": "", "type": "address[]", "internalType": "address[]" }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getApproved",
     "inputs": [
       { "name": "tokenId", "type": "uint256", "internalType": "uint256" }

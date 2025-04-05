@@ -485,6 +485,28 @@ export const updateEstateOwnerData = async(estateOwnerId, bodyData) => {
   }
 }
 
+export const upsertTokenizedPositionData = async(data) => {
+  try {
+    const response = await api.post('/user/upsert-tokenized-position', data, { headers: { 'x-api-key': 123 } });
+    return response.data;
+  }
+  catch (error) {
+    console.error('Tokenized Position Upsert Failed', error);
+    throw error;
+  }
+}
+
+export const getAllUserParticularTreData = async(tokenizedRealEstateAddr) => {
+  try {
+    const response = await api.get(`/user/get-all-user-tokenized-position?tokenizedRealEstateAddress=${tokenizedRealEstateAddr}`, { headers: { 'x-api-key': 123 } });
+    return response.data.data.allUserTokenizedPosition;
+  }
+  catch (error) {
+    console.error('Failed to get User TRE Position Data', error);
+    throw error;
+  }
+}
+
 export const updateEstateOwnerByNode = async (userId) => {
   try {
     const response = await api.patch(`/node/users/${userId}/verify`)

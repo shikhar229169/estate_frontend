@@ -185,6 +185,20 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "getClaimableRewards",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getClaimedRewards",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getCollateralDepositedBy",
     "inputs": [
       { "name": "user", "type": "address", "internalType": "address" }
