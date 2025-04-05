@@ -446,12 +446,12 @@ export const getEstateOwnerByAddress = async (ethAddress) => {
 export const updateCollateral = async (ethAddress, updateType, collateralChange) => {
   try {
     if (updateType === 'deposit') {
-      const bodyData = { collateralDeposited: collateralChange };
+      const bodyData = { collateralDeposited: Number(collateralChange) };
       const response = await api.patch(`/user/addCollateralOnEstateOwner/${ethAddress}`, bodyData, { headers: { 'x-api-key': 123 } });
       return response.data;
     }
     else {
-      const bodyData = { collateralWithdrawn: collateralChange };
+      const bodyData = { collateralWithdrawn: Number(collateralChange) };
       const response = await api.patch(`/user/subtractCollateralOnEstateOwner/${ethAddress}`, bodyData, { headers: { 'x-api-key': 123 } });
       return response.data;
     }

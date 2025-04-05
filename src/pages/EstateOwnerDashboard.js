@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Table, Alert, Spinner, Form, Tab, Tabs, Modal } from 'react-bootstrap';
 import { ethers } from 'ethers';
 import { getContracts, switchNetwork } from '../utils/interact';
-import { getEstateOwnerByAddress, updateEstateOwnerData } from '../utils/api';
+import { getEstateOwnerByAddress, updateEstateOwnerData, getAllUserParticularTreData } from '../utils/api';
 import TokenizedRealEstateABI from '../contracts/abi/TokenizedRealEstate';
 import ERC20ABI from '../contracts/abi/ERC20ABI';
 
@@ -26,6 +26,8 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
   const [newEstateCost, setNewEstateCost] = useState('');
   const [estateRewards, setEstateRewards] = useState('');
   const [collateralCollected, setCollateralCollected] = useState(0);
+  const [usersData, setUsersData] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   useEffect(() => {
     const loadContracts = async () => {
@@ -165,6 +167,26 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
     loadEstateOwner();
   }, [walletAddress, chainId, tokenDecimals]);
 
+  // New useEffect to fetch users data when tokenizationDetails is available
+  useEffect(() => {
+    const fetchUsersData = async () => {
+      if (tokenizationDetails?.tokenAddress && activeTab === 'usersData') {
+        try {
+          setLoadingUsers(true);
+          const userData = await getAllUserParticularTreData(tokenizationDetails.tokenAddress);
+          setUsersData(userData);
+        } catch (error) {
+          console.error('Error fetching users data:', error);
+          setError('Failed to load users data');
+        } finally {
+          setLoadingUsers(false);
+        }
+      }
+    };
+
+    fetchUsersData();
+  }, [tokenizationDetails, activeTab]);
+
   // New function to handle estate cost update
   const handleUpdateEstateCost = async (e) => {
     e.preventDefault();
@@ -261,6 +283,20 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
       setError(`Error sending rewards`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Helper function to get the correct block explorer URL based on chainId
+  const getBlockExplorerUrl = (address) => {
+    if (chainId === 43113) {
+      // Avalanche Fuji Testnet
+      return `https://testnet.snowtrace.io/address/${address}`;
+    } else if (chainId === 11155111) {
+      // Ethereum Sepolia Testnet
+      return `https://sepolia.etherscan.io/address/${address}`;
+    } else {
+      // Default to Ethereum Mainnet (though we shouldn't get here)
+      return `https://etherscan.io/address/${address}`;
     }
   };
 
@@ -490,6 +526,64 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
                     </tr>
                   </tbody>
                 </Table>
+              </Card.Body>
+            </Card>
+          </Tab>
+        )}
+
+        {tokenizationDetails?.isTokenized && (
+          <Tab eventKey="usersData" title="User Interactions">
+            <Card>
+              <Card.Body>
+                <h4>Users Interacting with Your Tokenized Real Estate</h4>
+                
+                {loadingUsers ? (
+                  <div className="text-center py-4">
+                    <Spinner animation="border" role="status">
+                      <span className="visually-hidden">Loading users data...</span>
+                    </Spinner>
+                  </div>
+                ) : usersData && usersData.length > 0 ? (
+                  <Table responsive bordered hover>
+                    <thead className="bg-light">
+                      <tr>
+                        <th>User Address</th>
+                        <th>TRE Minted</th>
+                        <th>Collateral Deposited</th>
+                        <th>Rewards Collected</th>
+                        <th className="text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {usersData.map((user, index) => (
+                        <tr key={index}>
+                          <td>
+                            <span className="d-inline-block text-truncate" style={{ maxWidth: "150px" }}>
+                              {user.userAddress}
+                            </span>
+                          </td>
+                          <td>{user.treMinted || 0} TRE</td>
+                          <td>{user.collateralDeposited || 0} {user.paymentTokenSymbol}</td>
+                          <td>{user.rewardsCollected || 0} {user.paymentTokenSymbol}</td>
+                          <td className="text-center">
+                            <Button 
+                              variant="outline-info" 
+                              size="sm"
+                              onClick={() => window.open(getBlockExplorerUrl(user.userAddress), '_blank')}
+                              title="View user details on blockchain explorer"
+                            >
+                              View User Details
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                ) : (
+                  <Alert variant="info">
+                    No users have interacted with your tokenized real estate yet.
+                  </Alert>
+                )}
               </Card.Body>
             </Card>
           </Tab>
