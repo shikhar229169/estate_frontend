@@ -404,7 +404,7 @@ export const getNodeOperatorByWalletAddress = async (walletAddress) => {
 
 export const getApprovedNodeOperators = async () => {
   try {
-    const response = await api.get('/node/get-approved-nodes', { headers: { 'x-api-key': 123 } });
+    const response = await api.get('/node/get-approved-nodes', { headers: { 'x-api-key': process.env.REACT_APP_HEADERS_API_KEY } });
     return response.data;
   } catch (error) {
     console.error('Failed to get approved node operators:', error);
@@ -435,7 +435,7 @@ export const getAllEstateOwners = async () => {
 
 export const getEstateOwnerByAddress = async (ethAddress) => {
   try {
-    const response = await api.get(`/user/eth/${ethAddress}`, { headers: { 'x-api-key': 123 } });
+    const response = await api.get(`/user/eth/${ethAddress}`, { headers: { 'x-api-key': process.env.REACT_APP_HEADERS_API_KEY } });
     return response.data;
   } catch (error) {
     console.error('Failed to get estate owner by address:', error);
@@ -447,12 +447,12 @@ export const updateCollateral = async (ethAddress, updateType, collateralChange)
   try {
     if (updateType === 'deposit') {
       const bodyData = { collateralDeposited: Number(collateralChange) };
-      const response = await api.patch(`/user/addCollateralOnEstateOwner/${ethAddress}`, bodyData, { headers: { 'x-api-key': 123 } });
+      const response = await api.patch(`/user/addCollateralOnEstateOwner/${ethAddress}`, bodyData, { headers: { 'x-api-key': process.env.REACT_APP_HEADERS_API_KEY } });
       return response.data;
     }
     else {
       const bodyData = { collateralWithdrawn: Number(collateralChange) };
-      const response = await api.patch(`/user/subtractCollateralOnEstateOwner/${ethAddress}`, bodyData, { headers: { 'x-api-key': 123 } });
+      const response = await api.patch(`/user/subtractCollateralOnEstateOwner/${ethAddress}`, bodyData, { headers: { 'x-api-key': process.env.REACT_APP_HEADERS_API_KEY } });
       return response.data;
     }
   }
@@ -476,7 +476,7 @@ export const getEstateOwnersByNodeOperator = async (nodeOperatorEns) => {
 // Currently used to update estate cost and estate rewards
 export const updateEstateOwnerData = async(estateOwnerId, bodyData) => {
   try {
-    const response = await api.patch(`/user/update/${estateOwnerId}`, bodyData, { headers: { 'x-api-key': 123 } });
+    const response = await api.patch(`/user/update/${estateOwnerId}`, bodyData, { headers: { 'x-api-key': process.env.REACT_APP_HEADERS_API_KEY } });
     return response.data;
   }
   catch (error) {
@@ -487,7 +487,7 @@ export const updateEstateOwnerData = async(estateOwnerId, bodyData) => {
 
 export const upsertTokenizedPositionData = async(data) => {
   try {
-    const response = await api.post('/user/upsert-tokenized-position', data, { headers: { 'x-api-key': 123 } });
+    const response = await api.post('/user/upsert-tokenized-position', data, { headers: { 'x-api-key': process.env.REACT_APP_HEADERS_API_KEY } });
     return response.data;
   }
   catch (error) {
@@ -498,7 +498,7 @@ export const upsertTokenizedPositionData = async(data) => {
 
 export const getAllUserParticularTreData = async(tokenizedRealEstateAddr) => {
   try {
-    const response = await api.get(`/user/get-all-user-tokenized-position?tokenizedRealEstateAddress=${tokenizedRealEstateAddr}`, { headers: { 'x-api-key': 123 } });
+    const response = await api.get(`/user/get-all-user-tokenized-position?tokenizedRealEstateAddress=${tokenizedRealEstateAddr}`, { headers: { 'x-api-key': process.env.REACT_APP_HEADERS_API_KEY } });
     return response.data.data.allUserTokenizedPosition;
   }
   catch (error) {
