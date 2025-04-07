@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Table, Alert, Spinner, Form, Tab, Tabs, Modal } from 'react-bootstrap';
 import { ethers } from 'ethers';
 import { getContracts, switchNetwork } from '../utils/interact';
-import { getEstateOwnerByAddress, updateEstateOwnerData, getAllUserParticularTreData } from '../utils/api';
+import { getEstateOwnerByAddress, updateEstateOwnerData, getAllUserParticularTreData, getParticularTreLog } from '../utils/api';
 import TokenizedRealEstateABI from '../contracts/abi/TokenizedRealEstate';
 import ERC20ABI from '../contracts/abi/ERC20ABI';
 
@@ -28,6 +28,8 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
   const [collateralCollected, setCollateralCollected] = useState(0);
   const [usersData, setUsersData] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [treLogData, setTreLogData] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
 
   useEffect(() => {
     const loadContracts = async () => {
@@ -184,7 +186,24 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
       }
     };
 
+    // Load transaction logs when tab is activated
+    const fetchTreLogs = async () => {
+      if (tokenizationDetails?.tokenAddress && activeTab === 'transactionLogs') {
+        try {
+          setLoadingLogs(true);
+          const logsData = await getParticularTreLog(tokenizationDetails.tokenAddress);
+          setTreLogData(logsData);
+        } catch (error) {
+          console.error('Error fetching transaction logs:', error);
+          setError('Failed to load transaction logs');
+        } finally {
+          setLoadingLogs(false);
+        }
+      }
+    };
+
     fetchUsersData();
+    fetchTreLogs();
   }, [tokenizationDetails, activeTab]);
 
   // New function to handle estate cost update
@@ -287,16 +306,54 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
   };
 
   // Helper function to get the correct block explorer URL based on chainId
-  const getBlockExplorerUrl = (address) => {
+  const getBlockExplorerUrl = (addressOrHash, isTransaction = false) => {
+    const chainId = window.ethereum?.chainId ? parseInt(window.ethereum.chainId, 16) : 1;
+    
+    let baseUrl = 'https://etherscan.io';
+    let pathPrefix = isTransaction ? 'tx' : 'address';
+    
     if (chainId === 43113) {
       // Avalanche Fuji Testnet
-      return `https://testnet.snowtrace.io/address/${address}`;
+      baseUrl = 'https://testnet.snowtrace.io';
     } else if (chainId === 11155111) {
       // Ethereum Sepolia Testnet
-      return `https://sepolia.etherscan.io/address/${address}`;
-    } else {
-      // Default to Ethereum Mainnet (though we shouldn't get here)
-      return `https://etherscan.io/address/${address}`;
+      baseUrl = 'https://sepolia.etherscan.io';
+    } else if (chainId === 43114) {
+      // Avalanche Mainnet
+      baseUrl = 'https://snowtrace.io';
+    }
+    
+    return `${baseUrl}/${pathPrefix}/${addressOrHash}`;
+  };
+
+  // Format date helper function
+  const formatDate = (dateString) => {
+    const options = { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: true
+    };
+    return new Date(dateString).toLocaleDateString(undefined, options);
+  };
+
+  // Helper function to get transaction type badge color
+  const getTransactionBadgeColor = (transactionType) => {
+    switch(transactionType.toLowerCase()) {
+      case 'collateral_deposit':
+        return 'success';
+      case 'collateral_withdraw':
+        return 'warning';
+      case 'tre_buy':
+        return 'primary';
+      case 'tre_sell':
+        return 'danger';
+      case 'rewards_collect':
+        return 'info';
+      default:
+        return 'secondary';
     }
   };
 
@@ -582,6 +639,70 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
                 ) : (
                   <Alert variant="info">
                     No users have interacted with your tokenized real estate yet.
+                  </Alert>
+                )}
+              </Card.Body>
+            </Card>
+          </Tab>
+        )}
+
+        {tokenizationDetails?.isTokenized && (
+          <Tab eventKey="transactionLogs" title="Transaction Logs">
+            <Card>
+              <Card.Body>
+                <h4>TRE Transaction Logs</h4>
+                
+                {loadingLogs ? (
+                  <div className="text-center py-4">
+                    <Spinner animation="border" role="status">
+                      <span className="visually-hidden">Loading transaction logs...</span>
+                    </Spinner>
+                  </div>
+                ) : treLogData && treLogData.length > 0 ? (
+                  <Table responsive bordered hover>
+                    <thead className="bg-light">
+                      <tr>
+                        <th>Date</th>
+                        <th>User Address</th>
+                        <th>Transaction Type</th>
+                        <th>Amount</th>
+                        <th>Token</th>
+                        <th className="text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {treLogData.map((log, index) => (
+                        <tr key={index}>
+                          <td>{formatDate(log.createdAt)}</td>
+                          <td>
+                            <span className="d-inline-block text-truncate" style={{ maxWidth: "150px" }} title={log.userAddress}>
+                              {log.userAddress}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`badge bg-${getTransactionBadgeColor(log.transactionType)}`}>
+                              {log.transactionType}
+                            </span>
+                          </td>
+                          <td>{log.transactionAmount}</td>
+                          <td>{log.transactionSymbol}</td>
+                          <td className="text-center">
+                            <Button 
+                              variant="outline-info" 
+                              size="sm"
+                              onClick={() => window.open(getBlockExplorerUrl(log.transactionHash, true), '_blank')}
+                              title="View transaction on blockchain explorer"
+                            >
+                              View Transaction
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                ) : (
+                  <Alert variant="info">
+                    No transaction logs found for your tokenized real estate.
                   </Alert>
                 )}
               </Card.Body>

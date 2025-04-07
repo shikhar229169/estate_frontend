@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Table, Alert, Spinner, Form, Row, Col, Modal } from 'react-bootstrap';
 import { ethers } from 'ethers';
 import { getContracts, switchNetwork, getAllTokenizedRealEstates, getERC20Contract } from '../utils/interact';
-import { getEstateOwnerByAddress, updateCollateral, upsertTokenizedPositionData } from '../utils/api'; // Import the function to get estate owner details
+import { getEstateOwnerByAddress, updateCollateral, upsertTokenizedPositionData, createTreLog } from '../utils/api';
 import TokenizedRealEstateABI from '../contracts/abi/TokenizedRealEstate';
 // Import FontAwesome icons
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -193,9 +193,11 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         treMinted: Number(formatTREAmount(selectedEstate.balance)) + Number(buyAmount)
       }
 
+      let tx;
+
       // Buy tokens
       if (chainId === 43113) {
-        const tx = await tokenContract.buyRealEstatePartialOwnershipWithCollateral(
+        tx = await tokenContract.buyRealEstatePartialOwnershipWithCollateral(
           buyAmountWei
         );
 
@@ -203,7 +205,7 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         setSuccess(`Successfully purchased ${buyAmount} ${selectedEstate.symbol} tokens!`);
       }
       else {
-        const tx = await tokenContract.buyRealEstatePartialOwnershipOnNonBaseChain(
+        tx = await tokenContract.buyRealEstatePartialOwnershipOnNonBaseChain(
           buyAmountWei,
           false, // mintIfLess
           500000 // gasLimit
@@ -213,7 +215,17 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         setSuccess(`Cross Chain Purchase Request Placed ${buyAmount} ${selectedEstate.symbol} tokens!`);
       }
 
+      const treLog = {
+        userAddress: walletAddress,
+        tokenizedRealEstateAddress: selectedEstate.address,
+        transactionType: "TRE_BUY",
+        transactionAmount: Number(buyAmount),
+        transactionSymbol: "TRE",
+        transactionHash: tx.hash,
+      }
+
       await upsertTokenizedPositionData(backendUpdateData);
+      await createTreLog(treLog);
 
       setShowBuyModal(false);
       setBuyAmount('');
@@ -270,9 +282,11 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         treMinted: Number(formatTREAmount(selectedEstate.balance)) - Number(sellAmount)
       }
 
+      let tx;
+
       // Sell tokens
       if (chainId === 43113) {
-        const tx = await tokenContract.burnEstateOwnershipTokens(
+        tx = await tokenContract.burnEstateOwnershipTokens(
           sellAmountWei
         );
 
@@ -280,7 +294,7 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         setSuccess(`Successfully sold ${sellAmount} ${selectedEstate.symbol} tokens!`);
       }
       else {
-        const tx = await tokenContract.burnEstateOwnershipTokensOnNonBaseChain(
+        tx = await tokenContract.burnEstateOwnershipTokensOnNonBaseChain(
           sellAmountWei,
           500000 // gasLimit
         );
@@ -289,7 +303,17 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         setSuccess(`Cross Chain Sell Request Placed ${sellAmount} ${selectedEstate.symbol} tokens!`);
       }
 
+      const treLog = {
+        userAddress: walletAddress,
+        tokenizedRealEstateAddress: selectedEstate.address,
+        transactionType: "TRE_SELL",
+        transactionAmount: Number(sellAmount),
+        transactionSymbol: "TRE",
+        transactionHash: tx.hash,
+      }
+
       await upsertTokenizedPositionData(backendUpdateData);
+      await createTreLog(treLog);
 
       setShowSellModal(false);
       setSellAmount('');
@@ -374,8 +398,18 @@ const UserDashboard = ({ walletAddress, chainId }) => {
 
       await tx.wait();
 
+      const treLog = {
+        userAddress: walletAddress,
+        tokenizedRealEstateAddress: selectedEstate.address,
+        transactionType: "COLLATERAL_DEPOSIT",
+        transactionAmount: Number(depositCollateralAmount),
+        transactionSymbol: selectedEstate.paymentTokenSymbol,
+        transactionHash: tx.hash,
+      }
+
       await updateCollateral(selectedEstate.estateOwner, 'deposit', depositCollateralAmount);
       await upsertTokenizedPositionData(backendUpdateData);
+      await createTreLog(treLog);
 
       setSuccess(`Successfully deposited ${depositCollateralAmount} ${selectedEstate.paymentTokenSymbol} as collateral!`);
       setShowDepositCollateralModal(false);
@@ -437,8 +471,18 @@ const UserDashboard = ({ walletAddress, chainId }) => {
       const tx = await tokenContract.withdrawCollateral(collateralAmountWei);
       await tx.wait();
 
+      const treLog = {
+        userAddress: walletAddress,
+        tokenizedRealEstateAddress: selectedEstate.address,
+        transactionType: "COLLATERAL_WITHDRAW",
+        transactionAmount: Number(withdrawCollateralAmount),
+        transactionSymbol: selectedEstate.paymentTokenSymbol,
+        transactionHash: tx.hash,
+      }
+
       await updateCollateral(selectedEstate.estateOwner, 'withdraw', withdrawCollateralAmount);
       await upsertTokenizedPositionData(backendUpdateData);
+      await createTreLog(treLog);
 
       setSuccess(`Successfully withdrawn ${withdrawCollateralAmount} ${selectedEstate.paymentTokenSymbol} from collateral!`);
       setShowWithdrawCollateralModal(false);
@@ -478,17 +522,27 @@ const UserDashboard = ({ walletAddress, chainId }) => {
       await tx.wait();
 
       const rewardsCollected = await tokenContract.getClaimedRewards();
-      const formmatedRewardsCollected = await formatTokenAmount(rewardsCollected, selectedEstate.paymentToken);
+      const formattedRewardsCollected = await formatTokenAmount(rewardsCollected, selectedEstate.paymentToken);
 
       const backendUpdateData = {
         userAddress: walletAddress,
         tokenizedRealEstateAddress: selectedEstate.address,
         paymentToken: selectedEstate.paymentToken,
         paymentTokenSymbol: selectedEstate.paymentTokenSymbol,
-        rewardsCollected: Number(formmatedRewardsCollected)
+        rewardsCollected: Number(formattedRewardsCollected)
+      }
+
+      const treLog = {
+        userAddress: walletAddress,
+        tokenizedRealEstateAddress: selectedEstate.address,
+        transactionType: "REWARDS_COLLECT",
+        transactionAmount: Number(formattedRewardsCollected),
+        transactionSymbol: selectedEstate.paymentTokenSymbol,
+        transactionHash: tx.hash,
       }
 
       await upsertTokenizedPositionData(backendUpdateData);
+      await createTreLog(treLog);
 
       setSuccess(`Successfully Claimed Tokens`);
       setShowRewardModal(false);
