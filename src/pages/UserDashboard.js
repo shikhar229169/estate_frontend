@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Table, Alert, Spinner, Form, Row, Col, Modal } from 'react-bootstrap';
 import { ethers } from 'ethers';
 import { getContracts, switchNetwork, getAllTokenizedRealEstates, getERC20Contract } from '../utils/interact';
-import { getEstateOwnerByAddress, updateCollateral, upsertTokenizedPositionData, createTreLog } from '../utils/api';
+import { getEstateOwnerByAddress, updateCollateral, upsertTokenizedPositionData, createTreLog, getUserTreLog } from '../utils/api';
 import TokenizedRealEstateABI from '../contracts/abi/TokenizedRealEstate';
 // Import FontAwesome icons
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faShoppingCart, faTags, faCoins, faMoneyBillTransfer, faDollarSign, faSnowflake, faMoneyCheckDollar, faInfoCircle } from '@fortawesome/free-solid-svg-icons';
+import { faShoppingCart, faTags, faCoins, faMoneyBillTransfer, faDollarSign, faSnowflake, faMoneyCheckDollar, faInfoCircle, faHistory, faDownload } from '@fortawesome/free-solid-svg-icons';
+// Import Excel export library
+import * as XLSX from 'xlsx';
 
 const UserDashboard = ({ walletAddress, chainId }) => {
   const [contracts, setContracts] = useState(null);
@@ -28,6 +30,9 @@ const UserDashboard = ({ walletAddress, chainId }) => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [estateOwnerDetails, setEstateOwnerDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [showTransactionHistoryModal, setShowTransactionHistoryModal] = useState(false);
+  const [transactionHistory, setTransactionHistory] = useState([]);
+  const [loadingTransactionHistory, setLoadingTransactionHistory] = useState(false);
 
   useEffect(() => {
     if (window.ethereum) {
@@ -585,6 +590,110 @@ const UserDashboard = ({ walletAddress, chainId }) => {
     setShowDetailsModal(true);
   };
 
+  // New function: Helper function to get the correct block explorer URL based on chainId
+  const getBlockExplorerUrl = (addressOrHash, isTransaction = false) => {
+    const chainId = window.ethereum?.chainId ? parseInt(window.ethereum.chainId, 16) : 1;
+    
+    let baseUrl = 'https://etherscan.io';
+    let pathPrefix = isTransaction ? 'tx' : 'address';
+    
+    if (chainId === 43113) {
+      // Avalanche Fuji Testnet
+      baseUrl = 'https://testnet.snowtrace.io';
+    } else if (chainId === 11155111) {
+      // Ethereum Sepolia Testnet
+      baseUrl = 'https://sepolia.etherscan.io';
+    } else if (chainId === 43114) {
+      // Avalanche Mainnet
+      baseUrl = 'https://snowtrace.io';
+    }
+    
+    return `${baseUrl}/${pathPrefix}/${addressOrHash}`;
+  };
+
+  // Format date helper function
+  const formatDate = (dateString) => {
+    const options = { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: true
+    };
+    return new Date(dateString).toLocaleDateString(undefined, options);
+  };
+
+  // Helper function to get transaction type badge color
+  const getTransactionBadgeColor = (transactionType) => {
+    switch(transactionType.toLowerCase()) {
+      case 'collateral_deposit':
+        return 'success';
+      case 'collateral_withdraw':
+        return 'warning';
+      case 'tre_buy':
+        return 'primary';
+      case 'tre_sell':
+        return 'danger';
+      case 'rewards_collect':
+        return 'info';
+      default:
+        return 'secondary';
+    }
+  };
+
+  // Handle viewing transaction history
+  const handleViewTransactionHistory = async (estate) => {
+    setSelectedEstate(estate);
+    setShowTransactionHistoryModal(true);
+    await fetchTransactionHistory(estate);
+  };
+
+  // Fetch transaction history for a specific estate
+  const fetchTransactionHistory = async (estate) => {
+    try {
+      setLoadingTransactionHistory(true);
+      setError('');
+      
+      const response = await getUserTreLog(estate.address, walletAddress);
+      setTransactionHistory(response);
+    } catch (error) {
+      console.error('Error fetching transaction history:', error);
+      setError('Failed to load transaction history. Please try again.');
+    } finally {
+      setLoadingTransactionHistory(false);
+    }
+  };
+
+  // Helper function to export transaction history to Excel file
+  const exportToExcel = () => {
+    if (!transactionHistory || transactionHistory.length === 0 || !selectedEstate || !walletAddress) return;
+
+    // Create worksheet data
+    const worksheetData = transactionHistory.map(transaction => ({
+      'Date': formatDate(transaction.createdAt),
+      'Transaction Type': transaction.transactionType,
+      'Amount': transaction.transactionAmount,
+      'Token': transaction.transactionSymbol,
+      'Transaction Hash': transaction.transactionHash
+    }));
+
+    // Create a new workbook and add the data
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Transactions');
+
+    // Generate file name using the requested format
+    const shortTreAddress = selectedEstate.address.slice(0, 10); // Shorten for file name
+    const shortUserAddress = walletAddress.slice(0, 10); // Shorten for file name
+    const fileName = `tre-log-${shortTreAddress}-${shortUserAddress}.xlsx`;
+
+    // Export to file
+    XLSX.writeFile(workbook, fileName);
+  };
+
   const handleNetworkSwitch = async (targetChainId) => {
     try {
       setLoading(true);
@@ -681,6 +790,16 @@ const UserDashboard = ({ walletAddress, chainId }) => {
                       size="md"
                     >
                       <FontAwesomeIcon icon={faInfoCircle} className="me-1" /> View Details
+                    </Button>
+
+                    {/* Add Transaction History button */}
+                    <Button
+                      variant="outline-dark"
+                      onClick={() => handleViewTransactionHistory(estate)}
+                      className="btn-action"
+                      size="md"
+                    >
+                      <FontAwesomeIcon icon={faHistory} className="me-1" /> Transaction History
                     </Button>
 
                     <Button
@@ -1066,6 +1185,83 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         </Modal.Footer>
       </Modal>
 
+      {/* Transaction History Modal */}
+      <Modal show={showTransactionHistoryModal} onHide={() => setShowTransactionHistoryModal(false)} centered size="lg">
+        <Modal.Header closeButton className="bg-light">
+          <Modal.Title>
+            <FontAwesomeIcon icon={faHistory} className="me-2 text-dark" />
+            Your Transaction History - {selectedEstate?.name} ({selectedEstate?.symbol})
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {loadingTransactionHistory ? (
+            <div className="text-center py-4">
+              <Spinner animation="border" role="status">
+                <span className="visually-hidden">Loading transaction history...</span>
+              </Spinner>
+            </div>
+          ) : transactionHistory && transactionHistory.length > 0 ? (
+            <>
+              <div className="d-flex justify-content-end mb-3">
+                <Button
+                  variant="success"
+                  size="sm"
+                  onClick={exportToExcel}
+                  className="download-btn"
+                >
+                  <FontAwesomeIcon icon={faDownload} className="me-2" />
+                  Export Excel
+                </Button>
+              </div>
+              <Table responsive bordered hover>
+                <thead className="bg-light">
+                  <tr>
+                    <th>Date</th>
+                    <th>Transaction Type</th>
+                    <th>Amount</th>
+                    <th>Token</th>
+                    <th className="text-center">Transaction Hash</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactionHistory.map((transaction, index) => (
+                    <tr key={index}>
+                      <td>{formatDate(transaction.createdAt)}</td>
+                      <td>
+                        <span className={`badge bg-${getTransactionBadgeColor(transaction.transactionType)}`}>
+                          {transaction.transactionType}
+                        </span>
+                      </td>
+                      <td>{transaction.transactionAmount}</td>
+                      <td>{transaction.transactionSymbol}</td>
+                      <td className="text-center">
+                        <Button 
+                          variant="outline-info" 
+                          size="sm"
+                          onClick={() => window.open(getBlockExplorerUrl(transaction.transactionHash, true), '_blank')}
+                          title="View transaction on blockchain explorer"
+                        >
+                          View Transaction
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </>
+          ) : (
+            <Alert variant="info">
+              No transaction history found for this tokenized real estate.
+            </Alert>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowTransactionHistoryModal(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
       <style jsx="true">{`
         .btn-action {
           min-width: 110px;
@@ -1111,6 +1307,16 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         .estate-details h4 {
           color: #2c3e50;
           font-weight: 600;
+        }
+        .download-btn {
+          border-radius: 6px;
+          font-weight: 500;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .download-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
       `}</style>
     </div>

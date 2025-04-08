@@ -5,6 +5,11 @@ import { getContracts, switchNetwork } from '../utils/interact';
 import { getEstateOwnerByAddress, updateEstateOwnerData, getAllUserParticularTreData, getParticularTreLog } from '../utils/api';
 import TokenizedRealEstateABI from '../contracts/abi/TokenizedRealEstate';
 import ERC20ABI from '../contracts/abi/ERC20ABI';
+// Import FontAwesome icons
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faDownload } from '@fortawesome/free-solid-svg-icons';
+// Import Excel export library
+import * as XLSX from 'xlsx';
 
 const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
   const [activeTab, setActiveTab] = useState('estateDetails');
@@ -281,7 +286,7 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
 
       const paymentToken = new ethers.Contract(estateOwner.token, ERC20ABI, signer);
       const allowance = await paymentToken.allowance(walletAddress, tokenizationDetails.tokenAddress);
-      
+
       if (allowance.lt(rewardsInWei)) {
         const approveRewardTxn = await paymentToken.approve(tokenizationDetails.tokenAddress, rewardsInWei);
         await approveRewardTxn.wait();
@@ -308,10 +313,10 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
   // Helper function to get the correct block explorer URL based on chainId
   const getBlockExplorerUrl = (addressOrHash, isTransaction = false) => {
     const chainId = window.ethereum?.chainId ? parseInt(window.ethereum.chainId, 16) : 1;
-    
+
     let baseUrl = 'https://etherscan.io';
     let pathPrefix = isTransaction ? 'tx' : 'address';
-    
+
     if (chainId === 43113) {
       // Avalanche Fuji Testnet
       baseUrl = 'https://testnet.snowtrace.io';
@@ -322,17 +327,17 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
       // Avalanche Mainnet
       baseUrl = 'https://snowtrace.io';
     }
-    
+
     return `${baseUrl}/${pathPrefix}/${addressOrHash}`;
   };
 
   // Format date helper function
   const formatDate = (dateString) => {
-    const options = { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric', 
-      hour: '2-digit', 
+    const options = {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
       minute: '2-digit',
       hour12: true
     };
@@ -341,7 +346,7 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
 
   // Helper function to get transaction type badge color
   const getTransactionBadgeColor = (transactionType) => {
-    switch(transactionType.toLowerCase()) {
+    switch (transactionType.toLowerCase()) {
       case 'collateral_deposit':
         return 'success';
       case 'collateral_withdraw':
@@ -355,6 +360,63 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
       default:
         return 'secondary';
     }
+  };
+
+  // Helper function to export users data to Excel file
+  const exportUsersToExcel = () => {
+    if (!usersData || usersData.length === 0 || !tokenizationDetails) return;
+
+    // Create worksheet data
+    const worksheetData = usersData.map(user => ({
+      'User Address': user.userAddress,
+      'TRE Minted': user.treMinted || 0,
+      'Collateral Deposited': user.collateralDeposited || 0,
+      'Payment Token': user.paymentTokenSymbol,
+      'Rewards Collected': user.rewardsCollected || 0
+    }));
+
+    // Create a new workbook and add the data
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Users');
+
+    // Generate file name using the requested format
+    const shortTreAddress = tokenizationDetails.tokenAddress.slice(0, 10); // Shorten for file name
+    const fileName = `tre-users-${shortTreAddress}.xlsx`;
+
+    // Export to file
+    XLSX.writeFile(workbook, fileName);
+  };
+
+  // Helper function to export transaction logs to Excel file
+  const exportLogsToExcel = () => {
+    if (!treLogData || treLogData.length === 0 || !tokenizationDetails) return;
+
+    // Create worksheet data
+    const worksheetData = treLogData.map(log => ({
+      'Date': formatDate(log.createdAt),
+      'User Address': log.userAddress,
+      'Transaction Type': log.transactionType,
+      'Amount': log.transactionAmount,
+      'Token': log.transactionSymbol,
+      'Transaction Hash': log.transactionHash
+    }));
+
+    // Create a new workbook and add the data
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Transactions');
+
+    // Generate file name using the requested format
+    const shortTreAddress = tokenizationDetails.tokenAddress.slice(0, 10); // Shorten for file name
+    const fileName = `tre-logs-${shortTreAddress}.xlsx`;
+
+    // Export to file
+    XLSX.writeFile(workbook, fileName);
   };
 
   if (!walletAddress) {
@@ -593,7 +655,7 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
             <Card>
               <Card.Body>
                 <h4>Users Interacting with Your Tokenized Real Estate</h4>
-                
+
                 {loadingUsers ? (
                   <div className="text-center py-4">
                     <Spinner animation="border" role="status">
@@ -601,41 +663,54 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
                     </Spinner>
                   </div>
                 ) : usersData && usersData.length > 0 ? (
-                  <Table responsive bordered hover>
-                    <thead className="bg-light">
-                      <tr>
-                        <th>User Address</th>
-                        <th>TRE Minted</th>
-                        <th>Collateral Deposited</th>
-                        <th>Rewards Collected</th>
-                        <th className="text-center">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {usersData.map((user, index) => (
-                        <tr key={index}>
-                          <td>
-                            <span className="d-inline-block text-truncate" style={{ maxWidth: "150px" }}>
-                              {user.userAddress}
-                            </span>
-                          </td>
-                          <td>{user.treMinted || 0} TRE</td>
-                          <td>{user.collateralDeposited || 0} {user.paymentTokenSymbol}</td>
-                          <td>{user.rewardsCollected || 0} {user.paymentTokenSymbol}</td>
-                          <td className="text-center">
-                            <Button 
-                              variant="outline-info" 
-                              size="sm"
-                              onClick={() => window.open(getBlockExplorerUrl(user.userAddress), '_blank')}
-                              title="View user details on blockchain explorer"
-                            >
-                              View User Details
-                            </Button>
-                          </td>
+                  <>
+                    <div className="d-flex justify-content-end mb-3">
+                      <Button
+                        variant="success"
+                        size="sm"
+                        onClick={exportUsersToExcel}
+                        className="download-btn"
+                      >
+                        <FontAwesomeIcon icon={faDownload} className="me-2" />
+                        Export Excel
+                      </Button>
+                    </div>
+                    <Table responsive bordered hover>
+                      <thead className="bg-light">
+                        <tr>
+                          <th>User Address</th>
+                          <th>TRE Minted</th>
+                          <th>Collateral Deposited</th>
+                          <th>Rewards Collected</th>
+                          <th className="text-center">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </Table>
+                      </thead>
+                      <tbody>
+                        {usersData.map((user, index) => (
+                          <tr key={index}>
+                            <td>
+                              <span className="d-inline-block text-truncate" style={{ maxWidth: "150px" }}>
+                                {user.userAddress}
+                              </span>
+                            </td>
+                            <td>{user.treMinted || 0} TRE</td>
+                            <td>{user.collateralDeposited || 0} {user.paymentTokenSymbol}</td>
+                            <td>{user.rewardsCollected || 0} {user.paymentTokenSymbol}</td>
+                            <td className="text-center">
+                              <Button
+                                variant="outline-info"
+                                size="sm"
+                                onClick={() => window.open(getBlockExplorerUrl(user.userAddress), '_blank')}
+                                title="View user details on blockchain explorer"
+                              >
+                                View User Details
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  </>
                 ) : (
                   <Alert variant="info">
                     No users have interacted with your tokenized real estate yet.
@@ -651,7 +726,7 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
             <Card>
               <Card.Body>
                 <h4>TRE Transaction Logs</h4>
-                
+
                 {loadingLogs ? (
                   <div className="text-center py-4">
                     <Spinner animation="border" role="status">
@@ -659,47 +734,60 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
                     </Spinner>
                   </div>
                 ) : treLogData && treLogData.length > 0 ? (
-                  <Table responsive bordered hover>
-                    <thead className="bg-light">
-                      <tr>
-                        <th>Date</th>
-                        <th>User Address</th>
-                        <th>Transaction Type</th>
-                        <th>Amount</th>
-                        <th>Token</th>
-                        <th className="text-center">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {treLogData.map((log, index) => (
-                        <tr key={index}>
-                          <td>{formatDate(log.createdAt)}</td>
-                          <td>
-                            <span className="d-inline-block text-truncate" style={{ maxWidth: "150px" }} title={log.userAddress}>
-                              {log.userAddress}
-                            </span>
-                          </td>
-                          <td>
-                            <span className={`badge bg-${getTransactionBadgeColor(log.transactionType)}`}>
-                              {log.transactionType}
-                            </span>
-                          </td>
-                          <td>{log.transactionAmount}</td>
-                          <td>{log.transactionSymbol}</td>
-                          <td className="text-center">
-                            <Button 
-                              variant="outline-info" 
-                              size="sm"
-                              onClick={() => window.open(getBlockExplorerUrl(log.transactionHash, true), '_blank')}
-                              title="View transaction on blockchain explorer"
-                            >
-                              View Transaction
-                            </Button>
-                          </td>
+                  <>
+                    <div className="d-flex justify-content-end mb-3">
+                      <Button
+                        variant="success"
+                        size="sm"
+                        onClick={exportLogsToExcel}
+                        className="download-btn"
+                      >
+                        <FontAwesomeIcon icon={faDownload} className="me-2" />
+                        Export Excel
+                      </Button>
+                    </div>
+                    <Table responsive bordered hover>
+                      <thead className="bg-light">
+                        <tr>
+                          <th>Date</th>
+                          <th>User Address</th>
+                          <th>Transaction Type</th>
+                          <th>Amount</th>
+                          <th>Token</th>
+                          <th className="text-center">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </Table>
+                      </thead>
+                      <tbody>
+                        {treLogData.map((log, index) => (
+                          <tr key={index}>
+                            <td>{formatDate(log.createdAt)}</td>
+                            <td>
+                              <span className="d-inline-block text-truncate" style={{ maxWidth: "150px" }} title={log.userAddress}>
+                                {log.userAddress}
+                              </span>
+                            </td>
+                            <td>
+                              <span className={`badge bg-${getTransactionBadgeColor(log.transactionType)}`}>
+                                {log.transactionType}
+                              </span>
+                            </td>
+                            <td>{log.transactionAmount}</td>
+                            <td>{log.transactionSymbol}</td>
+                            <td className="text-center">
+                              <Button
+                                variant="outline-info"
+                                size="sm"
+                                onClick={() => window.open(getBlockExplorerUrl(log.transactionHash, true), '_blank')}
+                                title="View transaction on blockchain explorer"
+                              >
+                                View Transaction
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  </>
                 ) : (
                   <Alert variant="info">
                     No transaction logs found for your tokenized real estate.
@@ -766,6 +854,20 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
           </Form>
         </Modal.Body>
       </Modal>
+
+      <style jsx="true">{`
+        /* ...existing styles... */
+        .download-btn {
+          border-radius: 6px;
+          font-weight: 500;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .download-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+      `}</style>
     </div>
   );
 };

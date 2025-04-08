@@ -530,6 +530,17 @@ export const getParticularTreLog = async(tokenizedRealEstateAddress) => {
   }
 }
 
+export const getUserTreLog = async(tokenizedRealEstateAddress, userAddress) => {
+  try {
+    const response = await api.get(`/user/tre-log/detail?tokenizedRealEstateAddress=${tokenizedRealEstateAddress}&userAddress=${userAddress}`, { headers: { 'x-api-key': 123 } });
+    return response.data.data.treLogs;
+  }
+  catch (error) {
+    console.error('Error fetching User TRE Log', error);
+    throw error;
+  }
+}
+
 export const updateEstateOwnerByNode = async (userId) => {
   try {
     const response = await api.patch(`/node/users/${userId}/verify`)
