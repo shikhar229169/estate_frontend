@@ -13,9 +13,11 @@ const Navigation = ({ walletAddress, connectWalletPressed, chainId, role }) => {
   };
 
   return (
-    <Navbar bg="light" expand="lg">
+    <Navbar bg="light" expand="lg" className="custom-navbar">
       <Container>
-        <Navbar.Brand as={Link} to="/">Real Estate Tokenization</Navbar.Brand>
+        <Navbar.Brand as={Link} to="/" className="brand-logo">
+          <span className="brand-icon">🏠</span> Real Estate Tokenization
+        </Navbar.Brand>
         <Navbar.Toggle aria-controls="basic-navbar-nav" />
         <Navbar.Collapse id="basic-navbar-nav">
           <Nav className="me-auto">
@@ -63,17 +65,18 @@ const Navigation = ({ walletAddress, connectWalletPressed, chainId, role }) => {
             
             {walletAddress ? (
               <div className="d-flex">
-                <Button variant="outline-secondary" disabled>
+                <Button variant="outline-secondary" disabled className="wallet-address-button">
+                  <span className="wallet-icon me-2">👛</span>
                   {formatAddress(walletAddress)}
                 </Button>
                 {role && (
-                  <Button variant="outline-danger" className="ms-2" onClick={handleLogout}>
+                  <Button variant="outline-danger" className="ms-2 logout-button" onClick={handleLogout}>
                     Logout
                   </Button>
                 )}
               </div>
             ) : (
-              <Button variant="primary" onClick={connectWalletPressed}>
+              <Button variant="primary" onClick={connectWalletPressed} className="navbar-connect-btn">
                 Connect Wallet
               </Button>
             )}

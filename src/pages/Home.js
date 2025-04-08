@@ -228,15 +228,17 @@ const Home = ({ walletAddress, connectWalletPressed, setRole, role }) => {
 
   return (
     <div className="home-container">
-      <h1 className="text-center mb-4">Real Estate Tokenization Platform</h1>
-      
       {!walletAddress && (
-        <div className="text-center mb-4">
-          <Button variant="primary" size="lg" onClick={connectWalletPressed}>
+        <div className="welcome-banner">
+          <h2>Welcome to Real Estate Tokenization Platform</h2>
+          <p>Connect your wallet to explore tokenized real estate investments, manage properties, and earn rewards through blockchain technology.</p>
+          <Button variant="primary" size="lg" onClick={connectWalletPressed} className="connect-wallet-btn">
             Connect Wallet
           </Button>
         </div>
       )}
+      
+      <h1 className={walletAddress ? "" : "mt-4"}>Real Estate Tokenization Platform</h1>
       
       {error && <Alert variant="danger">{error}</Alert>}
       {success && <Alert variant="success">{success}</Alert>}
@@ -318,25 +320,32 @@ const Home = ({ walletAddress, connectWalletPressed, setRole, role }) => {
         </Row>
       )}
       
-      {activeForm && renderForm()}
+      {activeForm && (
+        <div className="form-login">
+          {renderForm()}
+        </div>
+      )}
       
       {walletAddress && activeForm && (
-        <div className="text-center mt-3">
+        <div className="text-center mt-3 back-link">
           <Button variant="link" onClick={() => setActiveForm('')}>
-            Back to Role Selection
+            ← Back to Role Selection
           </Button>
         </div>
       )}
       
-      <div className="mt-5">
+      <div className="supported-chains">
         <h3>Supported Chains</h3>
         <Row>
           <Col md={6}>
-            <Card>
+            <Card className="chain-card">
               <Card.Body>
-                <Card.Title>Avalanche Fuji Testnet</Card.Title>
+                <Card.Title>
+                  <span className="chain-icon me-2">🔴</span>
+                  Avalanche Fuji Testnet
+                </Card.Title>
                 <Card.Text>
-                  Chain ID: 43113
+                  Chain ID: 43113 - Fast transactions with low gas fees, perfect for real estate tokenization.
                 </Card.Text>
                 <Button 
                   variant="outline-primary"
@@ -349,11 +358,14 @@ const Home = ({ walletAddress, connectWalletPressed, setRole, role }) => {
           </Col>
           
           <Col md={6}>
-            <Card>
+            <Card className="chain-card">
               <Card.Body>
-                <Card.Title>Ethereum Sepolia Testnet</Card.Title>
+                <Card.Title>
+                  <span className="chain-icon me-2">🔵</span>
+                  Ethereum Sepolia Testnet
+                </Card.Title>
                 <Card.Text>
-                  Chain ID: 11155111
+                  Chain ID: 11155111 - Ethereum's testnet with broad developer support and robust security.
                 </Card.Text>
                 <Button 
                   variant="outline-primary"
