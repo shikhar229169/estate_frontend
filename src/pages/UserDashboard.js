@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Table, Alert, Spinner, Form, Row, Col, Modal } from 'react-bootstrap';
+import { Card, Button, Table, Alert, Spinner, Form, Row, Col, Modal, Container, Badge } from 'react-bootstrap';
 import { ethers } from 'ethers';
 import { getContracts, switchNetwork, getAllTokenizedRealEstates, getERC20Contract } from '../utils/interact';
 import { getEstateOwnerByAddress, updateCollateral, upsertTokenizedPositionData, createTreLog, getUserTreLog } from '../utils/api';
 import TokenizedRealEstateABI from '../contracts/abi/TokenizedRealEstate';
 // Import FontAwesome icons
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faShoppingCart, faTags, faCoins, faMoneyBillTransfer, faDollarSign, faSnowflake, faMoneyCheckDollar, faInfoCircle, faHistory, faDownload } from '@fortawesome/free-solid-svg-icons';
+import { faShoppingCart, faTags, faCoins, faMoneyBillTransfer, faDollarSign, faSnowflake, faMoneyCheckDollar, 
+  faInfoCircle, faHistory, faDownload, faHome, faChartLine, faWallet, faBuilding, faLayerGroup, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
 // Import Excel export library
 import * as XLSX from 'xlsx';
 
@@ -707,198 +708,258 @@ const UserDashboard = ({ walletAddress, chainId }) => {
 
   return (
     <div className="user-dashboard">
-      <h2 className="mb-4">User Dashboard</h2>
-
-      {error && <Alert variant="danger">{error}</Alert>}
-      {success && <Alert variant="success">{success}</Alert>}
-
-      {loading && (
-        <div className="text-center mb-4">
-          <Spinner animation="border" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </Spinner>
-        </div>
-      )}
-
-      <h3>Available Real Estate Tokens</h3>
-
-      {tokenizedEstates.length === 0 ? (
-        <Alert variant="info">
-          No tokenized estates available at the moment. Check back later!
-        </Alert>
-      ) : (
-        <Row>
-          {tokenizedEstates.map((estate, index) => (
-            <Col md={6} lg={4} key={index} className="mb-4">
-              <Card className="h-100 shadow-sm border-0 rounded-3">
-                <Card.Body>
-                  <Card.Title className="d-flex justify-content-between align-items-center">
-                    <span>{estate.name} ({estate.symbol})</span>
-                    <span className="badge bg-light text-dark">ID: {estate.tokenId}</span>
-                  </Card.Title>
-                  <Card.Title className="d-flex flex-column">
-                    <div className="font-monospace badge text-dark">Estate Owner:</div>
-                    <div className="font-monospace badge bg-light text-dark">{estate.estateOwner}</div>
-                  </Card.Title>
-                  <Table responsive bordered size="sm">
-                    <tbody>
-                      <tr>
-                        <th>Total Supply</th>
-                        <td>{formatTREAmount(estate.totalSupply)} TRE</td>
-                      </tr>
-                      <tr>
-                        <th>Your Current Chain Balance</th>
-                        <td>{formatTREAmount(estate.balance)} TRE</td>
-                      </tr>
-                      {estate.allChainsBalance && <tr>
-                        <th>Your Aggregated Chains Balance</th>
-                        <td>{formatTREAmount(estate.allChainsBalance)} TRE</td>
-                      </tr>}
-                      <tr>
-                        <th>Token Price</th>
-                        <td>{estate.formattedTokenPrice} {estate.paymentTokenSymbol}</td>
-                      </tr>
-                      <tr>
-                        <th>Available</th>
-                        <td>{formatTREAmount(estate.tokensAvailable)} TRE</td>
-                      </tr>
-                      <tr>
-                        <th>Your Collateral</th>
-                        <td>{estate.formattedCollateral || "0"} {estate.paymentTokenSymbol}</td>
-                      </tr>
-                      {chainId === 43113 &&
-                        <>
-                          <tr>
-                            <th>Claimed Rewards</th>
-                            <td>{estate.claimedRewards || "0"} {estate.paymentTokenSymbol}</td>
-                          </tr>
-                          <tr>
-                            <th>Claimable Rewards</th>
-                            <td>{estate.claimableRewards || "0"} {estate.paymentTokenSymbol}</td>
-                          </tr>
-                        </>
-                      }
-                    </tbody>
-                  </Table>
-
-                  <div className="d-flex flex-wrap justify-content-center gap-2 mt-4">
-                    {/* Add View Details button */}
-                    <Button
-                      variant="outline-primary"
-                      onClick={() => handleViewDetails(estate)}
-                      className="btn-action"
-                      size="md"
-                    >
-                      <FontAwesomeIcon icon={faInfoCircle} className="me-1" /> View Details
-                    </Button>
-
-                    {/* Add Transaction History button */}
-                    <Button
-                      variant="outline-dark"
-                      onClick={() => handleViewTransactionHistory(estate)}
-                      className="btn-action"
-                      size="md"
-                    >
-                      <FontAwesomeIcon icon={faHistory} className="me-1" /> Transaction History
-                    </Button>
-
-                    <Button
-                      variant="outline-success"
-                      onClick={() => {
-                        setSelectedEstate(estate);
-                        setShowBuyModal(true);
-                      }}
-                      disabled={!estate.tokensAvailable || estate.tokensAvailable.isZero()}
-                      className="btn-action"
-                      size="md"
-                    >
-                      <FontAwesomeIcon icon={faShoppingCart} className="me-1" /> Buy TRE Tokens
-                    </Button>
-
-                    <Button
-                      variant="outline-warning"
-                      onClick={() => {
-                        setSelectedEstate(estate);
-                        setShowSellModal(true);
-                      }}
-                      disabled={!estate.balance || estate.balance.isZero()}
-                      className="btn-action"
-                      size="md"
-                    >
-                      <FontAwesomeIcon icon={faTags} className="me-1" /> Sell TRE Tokens
-                    </Button>
-
-                    <Button
-                      variant="outline-info"
-                      onClick={() => {
-                        setSelectedEstate(estate);
-                        setShowDepositCollateralModal(true);
-                      }}
-                      className="btn-action"
-                      size="md"
-                    >
-                      <FontAwesomeIcon icon={faCoins} className="me-1" /> Deposit Collateral
-                    </Button>
-
-                    <Button
-                      variant="outline-secondary"
-                      onClick={() => {
-                        setSelectedEstate(estate);
-                        setShowWithdrawCollateralModal(true);
-                      }}
-                      disabled={!estate.userCollateral || estate.userCollateral.isZero()}
-                      className="btn-action"
-                      size="md"
-                    >
-                      <FontAwesomeIcon icon={faMoneyBillTransfer} className="me-1" /> Withdraw Collateral
-                    </Button>
-                    {chainId === 43113 &&
-                      <Button
-                        variant="outline-primary"
-                        onClick={() => {
-                          setSelectedEstate(estate);
-                          setShowRewardModal(true);
-                        }}
-                        // disabled={!estate.claimableRewards}
-                        className="btn-action"
-                        size="md"
-                      >
-                        <FontAwesomeIcon icon={faMoneyCheckDollar} className="me-1" /> Claim Rewards
-                      </Button>
-                    }
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          ))}
-        </Row>
-      )}
-
-      <div className="d-flex flex-wrap justify-content-between align-items-center mt-5 mb-3">
-        <h2>Network Switcher</h2>
-        <div className="network-switcher">
-          <Button
-            variant={currentChainId === 11155111 ? "dark" : "outline-dark"}
-            className={`me-2 btn-network ${currentChainId === 11155111 ? 'active' : ''}`}
-            onClick={() => handleNetworkSwitch(11155111)}
-            disabled={loading || currentChainId === 11155111}
-          >
-            <FontAwesomeIcon icon={faDollarSign} className="me-2" /> Ethereum Sepolia
-          </Button>
-          <Button
-            variant={currentChainId === 43113 ? "dark" : "outline-dark"}
-            className={`btn-network ${currentChainId === 43113 ? 'active' : ''}`}
-            onClick={() => handleNetworkSwitch(43113)}
-            disabled={loading || currentChainId === 43113}
-          >
-            <FontAwesomeIcon icon={faSnowflake} className="me-2" /> Avalanche Fuji
-          </Button>
+      <div className="dashboard-header">
+        <div className="dashboard-header-content">
+          <div className="dashboard-title">
+            <h2><FontAwesomeIcon icon={faHome} className="me-3" />Real Estate Investment Dashboard</h2>
+            <p>Browse tokenized properties, invest in real estate tokens, and manage your portfolio</p>
+          </div>
+          <div className="dashboard-stats">
+            <div className="stat-item">
+              <div className="stat-icon">
+                <FontAwesomeIcon icon={faBuilding} />
+              </div>
+              <div className="stat-content">
+                <div className="stat-value">{tokenizedEstates.length}</div>
+                <div className="stat-label">Available Properties</div>
+              </div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-icon">
+                <FontAwesomeIcon icon={faLayerGroup} />
+              </div>
+              <div className="stat-content">
+                <div className="stat-value">
+                  {tokenizedEstates.filter(estate => 
+                    estate.balance && !estate.balance.isZero()).length}
+                </div>
+                <div className="stat-label">Your Investments</div>
+              </div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-icon">
+                <FontAwesomeIcon icon={faWallet} />
+              </div>
+              <div className="stat-content">
+                <div className="stat-value">
+                  {currentChainId && (currentChainId === 43113 ? 'AVAX' : 'ETH')}
+                </div>
+                <div className="stat-label">Network</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
+      {error && <Alert variant="danger" className="dashboard-alert"><FontAwesomeIcon icon={faInfoCircle} className="me-2" />{error}</Alert>}
+      {success && <Alert variant="success" className="dashboard-alert"><FontAwesomeIcon icon={faCheckCircle} className="me-2" />{success}</Alert>}
+
+      {loading && (
+        <div className="text-center my-5 py-5">
+          <div className="custom-spinner"></div>
+          <p className="loading-text mt-3">Loading your investments...</p>
+        </div>
+      )}
+
+      {!loading && (
+        <>
+          <div className="network-switcher-section">
+            <div className="d-flex flex-wrap justify-content-between align-items-center">
+              <h3 className="section-title">Network Switcher</h3>
+              <div className="network-switcher">
+                <Button
+                  variant={currentChainId === 11155111 ? "dark" : "outline-dark"}
+                  className={`me-2 btn-network ${currentChainId === 11155111 ? 'active' : ''}`}
+                  onClick={() => handleNetworkSwitch(11155111)}
+                  disabled={loading || currentChainId === 11155111}
+                >
+                  <FontAwesomeIcon icon={faDollarSign} className="me-2" /> Ethereum Sepolia
+                </Button>
+                <Button
+                  variant={currentChainId === 43113 ? "dark" : "outline-dark"}
+                  className={`btn-network ${currentChainId === 43113 ? 'active' : ''}`}
+                  onClick={() => handleNetworkSwitch(43113)}
+                  disabled={loading || currentChainId === 43113}
+                >
+                  <FontAwesomeIcon icon={faSnowflake} className="me-2" /> Avalanche Fuji
+                </Button>
+              </div>
+            </div>
+            <p className="network-description">
+              Switch between networks to view and manage your cross-chain real estate investments.
+              <br />Base chain (Avalanche) provides full functionality, while other chains enable cross-chain ownership.
+            </p>
+          </div>
+
+          <h3 className="section-title">Available Real Estate Tokens</h3>
+
+          {tokenizedEstates.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">
+                <FontAwesomeIcon icon={faBuilding} />
+              </div>
+              <h4>No tokenized estates available</h4>
+              <p>Check back later for new investment opportunities</p>
+            </div>
+          ) : (
+            <Row className="properties-grid">
+              {tokenizedEstates.map((estate, index) => (
+                <Col md={6} lg={4} key={index} className="mb-4">
+                  <Card className="property-card">
+                    <div className="property-header">
+                      <Badge bg="primary" className="property-id">ID: {estate.tokenId}</Badge>
+                      <h4 className="property-name">{estate.name}</h4>
+                      <div className="property-symbol">{estate.symbol}</div>
+                      <div className="property-owner">
+                        <span className="owner-label">Estate Owner:</span>
+                        <span className="owner-address">{estate.estateOwner.substring(0, 6)}...{estate.estateOwner.substring(estate.estateOwner.length - 4)}</span>
+                      </div>
+                    </div>
+                    <Card.Body>
+                      <div className="property-stats">
+                        <div className="stat-row">
+                          <div className="stat-name">Total Supply</div>
+                          <div className="stat-value">{formatTREAmount(estate.totalSupply)} TRE</div>
+                        </div>
+                        <div className="stat-row highlight">
+                          <div className="stat-name">Your Balance</div>
+                          <div className="stat-value">{formatTREAmount(estate.balance)} TRE</div>
+                        </div>
+                        {estate.allChainsBalance && <div className="stat-row">
+                          <div className="stat-name">Cross-Chain Balance</div>
+                          <div className="stat-value">{formatTREAmount(estate.allChainsBalance)} TRE</div>
+                        </div>}
+                        <div className="stat-row">
+                          <div className="stat-name">Token Price</div>
+                          <div className="stat-value">{estate.formattedTokenPrice} {estate.paymentTokenSymbol}</div>
+                        </div>
+                        <div className="stat-row">
+                          <div className="stat-name">Available</div>
+                          <div className="stat-value">{formatTREAmount(estate.tokensAvailable)} TRE</div>
+                        </div>
+                        <div className="stat-row">
+                          <div className="stat-name">Your Collateral</div>
+                          <div className="stat-value">{estate.formattedCollateral || "0"} {estate.paymentTokenSymbol}</div>
+                        </div>
+                        {chainId === 43113 && (
+                          <>
+                            <div className="stat-row">
+                              <div className="stat-name">Claimed Rewards</div>
+                              <div className="stat-value">{estate.claimedRewards || "0"} {estate.paymentTokenSymbol}</div>
+                            </div>
+                            <div className="stat-row highlight">
+                              <div className="stat-name">Claimable Rewards</div>
+                              <div className="stat-value">{estate.claimableRewards || "0"} {estate.paymentTokenSymbol}</div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="property-actions">
+                        <div className="action-buttons">
+                          <Button
+                            variant="outline-primary"
+                            onClick={() => handleViewDetails(estate)}
+                            className="btn-action"
+                            size="md"
+                          >
+                            <FontAwesomeIcon icon={faInfoCircle} className="me-1" /> Details
+                          </Button>
+
+                          <Button
+                            variant="outline-dark"
+                            onClick={() => handleViewTransactionHistory(estate)}
+                            className="btn-action"
+                            size="md"
+                          >
+                            <FontAwesomeIcon icon={faHistory} className="me-1" /> History
+                          </Button>
+                        </div>
+                        
+                        <div className="action-buttons mt-2">
+                          <Button
+                            variant="outline-success"
+                            onClick={() => {
+                              setSelectedEstate(estate);
+                              setShowBuyModal(true);
+                            }}
+                            disabled={!estate.tokensAvailable || estate.tokensAvailable.isZero()}
+                            className="btn-action"
+                            size="md"
+                          >
+                            <FontAwesomeIcon icon={faShoppingCart} className="me-1" /> Buy
+                          </Button>
+
+                          <Button
+                            variant="outline-warning"
+                            onClick={() => {
+                              setSelectedEstate(estate);
+                              setShowSellModal(true);
+                            }}
+                            disabled={!estate.balance || estate.balance.isZero()}
+                            className="btn-action"
+                            size="md"
+                          >
+                            <FontAwesomeIcon icon={faTags} className="me-1" /> Sell
+                          </Button>
+                        </div>
+                        
+                        <div className="action-buttons mt-2">
+                          <Button
+                            variant="outline-info"
+                            onClick={() => {
+                              setSelectedEstate(estate);
+                              setShowDepositCollateralModal(true);
+                            }}
+                            className="btn-action"
+                            size="md"
+                          >
+                            <FontAwesomeIcon icon={faCoins} className="me-1" /> Deposit
+                          </Button>
+
+                          <Button
+                            variant="outline-secondary"
+                            onClick={() => {
+                              setSelectedEstate(estate);
+                              setShowWithdrawCollateralModal(true);
+                            }}
+                            disabled={!estate.userCollateral || estate.userCollateral.isZero()}
+                            className="btn-action"
+                            size="md"
+                          >
+                            <FontAwesomeIcon icon={faMoneyBillTransfer} className="me-1" /> Withdraw
+                          </Button>
+                        </div>
+                        
+                        {chainId === 43113 && (
+                          <div className="text-center mt-2">
+                            <Button
+                              variant="outline-primary"
+                              onClick={() => {
+                                setSelectedEstate(estate);
+                                setShowRewardModal(true);
+                              }}
+                              className="btn-action btn-claim"
+                              size="md"
+                              disabled={parseFloat(estate.claimableRewards || 0) <= 0}
+                            >
+                              <FontAwesomeIcon icon={faMoneyCheckDollar} className="me-1" /> Claim Rewards
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+          )}
+        </>
+      )}
+
       {/* Buy Modal */}
-      <Modal show={showBuyModal} onHide={() => setShowBuyModal(false)} centered>
-        <Modal.Header closeButton className="bg-light">
+      <Modal show={showBuyModal} onHide={() => setShowBuyModal(false)} centered className="user-dashboard-modal">
+        <Modal.Header closeButton className="modal-header-custom">
           <Modal.Title>
             <FontAwesomeIcon icon={faShoppingCart} className="me-2 text-success" />
             Buy {selectedEstate?.symbol?.substr(0, 3)} Tokens
@@ -937,8 +998,8 @@ const UserDashboard = ({ walletAddress, chainId }) => {
       </Modal>
 
       {/* Sell Modal */}
-      <Modal show={showSellModal} onHide={() => setShowSellModal(false)} centered>
-        <Modal.Header closeButton className="bg-light">
+      <Modal show={showSellModal} onHide={() => setShowSellModal(false)} centered className="user-dashboard-modal">
+        <Modal.Header closeButton className="modal-header-custom">
           <Modal.Title>
             <FontAwesomeIcon icon={faTags} className="me-2 text-warning" />
             Sell {selectedEstate?.symbol?.substr(0, 3)} Tokens
@@ -977,8 +1038,8 @@ const UserDashboard = ({ walletAddress, chainId }) => {
       </Modal>
 
       {/* Deposit Collateral Modal */}
-      <Modal show={showDepositCollateralModal} onHide={() => setShowDepositCollateralModal(false)} centered>
-        <Modal.Header closeButton className="bg-light">
+      <Modal show={showDepositCollateralModal} onHide={() => setShowDepositCollateralModal(false)} centered className="user-dashboard-modal">
+        <Modal.Header closeButton className="modal-header-custom">
           <Modal.Title>
             <FontAwesomeIcon icon={faCoins} className="me-2 text-info" />
             Deposit Collateral
@@ -1016,8 +1077,8 @@ const UserDashboard = ({ walletAddress, chainId }) => {
       </Modal>
 
       {/* Withdraw Collateral Modal */}
-      <Modal show={showWithdrawCollateralModal} onHide={() => setShowWithdrawCollateralModal(false)} centered>
-        <Modal.Header closeButton className="bg-light">
+      <Modal show={showWithdrawCollateralModal} onHide={() => setShowWithdrawCollateralModal(false)} centered className="user-dashboard-modal">
+        <Modal.Header closeButton className="modal-header-custom">
           <Modal.Title>
             <FontAwesomeIcon icon={faMoneyBillTransfer} className="me-2 text-secondary" />
             Withdraw Collateral
@@ -1055,30 +1116,45 @@ const UserDashboard = ({ walletAddress, chainId }) => {
       </Modal>
 
       {/* Claim Rewards Modal */}
-      <Modal show={showRewardModal} onHide={() => setShowRewardModal(false)} centered>
-        <Modal.Header closeButton className="bg-light">
+      <Modal show={showRewardModal} onHide={() => setShowRewardModal(false)} centered className="user-dashboard-modal">
+        <Modal.Header closeButton className="modal-header-custom">
           <Modal.Title>
-            <FontAwesomeIcon icon={faMoneyBillTransfer} className="me-2 text-primary" />
+            <FontAwesomeIcon icon={faMoneyCheckDollar} className="me-2 text-primary" />
             Claim Rewards
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
+          <div className="rewards-info-box mb-4">
+            <div className="rewards-icon">
+              <FontAwesomeIcon icon={faChartLine} />
+            </div>
+            <div className="rewards-details">
+              <h5>Investment Rewards</h5>
+              <p>You'll receive distributions based on your share of property ownership, paid in {selectedEstate?.paymentTokenSymbol}</p>
+            </div>
+          </div>
+
           <Form onSubmit={handleClaimReward}>
             <Form.Group className="mb-3">
-              <Form.Label>Claimables - {selectedEstate?.paymentTokenSymbol}</Form.Label>
-              <Form.Control
-                type="number"
-                value={selectedEstate?.claimableRewards || '0'}
-                readOnly
-                className="form-control-modern"
-              />
+              <Form.Label>Claimable Rewards - {selectedEstate?.paymentTokenSymbol}</Form.Label>
+              <div className="rewards-amount">
+                {selectedEstate?.claimableRewards || '0'}
+              </div>
+              <Form.Text className="text-muted text-center d-block">
+                Claim your rewards earned from property rental income or appreciation
+              </Form.Text>
             </Form.Group>
 
             <div className="d-flex justify-content-end gap-2">
               <Button variant="outline-primary" onClick={() => setShowRewardModal(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" type="submit" disabled={loading} className="px-4">
+              <Button 
+                variant="primary" 
+                type="submit" 
+                disabled={loading || parseFloat(selectedEstate?.claimableRewards || 0) <= 0} 
+                className="px-4"
+              >
                 {loading ? <Spinner animation="border" size="sm" /> : 'Claim Rewards'}
               </Button>
             </div>
@@ -1087,236 +1163,864 @@ const UserDashboard = ({ walletAddress, chainId }) => {
       </Modal>
 
       {/* Estate Owner Details Modal */}
-      <Modal show={showDetailsModal} onHide={() => setShowDetailsModal(false)} centered size="lg">
-        <Modal.Header closeButton className="bg-light">
+      <Modal show={showDetailsModal} onHide={() => setShowDetailsModal(false)} centered size="lg" className="details-modal">
+        <Modal.Header closeButton className="details-modal-header">
           <Modal.Title>
-            <FontAwesomeIcon icon={faInfoCircle} className="me-2 text-primary" />
+            <FontAwesomeIcon icon={faInfoCircle} className="me-2" />
             Estate Details
           </Modal.Title>
         </Modal.Header>
-        <Modal.Body>
+        <Modal.Body className="details-modal-body">
           {loadingDetails ? (
             <div className="text-center py-4">
-              <Spinner animation="border" role="status">
-                <span className="visually-hidden">Loading estate details...</span>
-              </Spinner>
+              <div className="custom-spinner"></div>
+              <p className="mt-3">Loading estate details...</p>
             </div>
           ) : estateOwnerDetails ? (
-            <div className="estate-details">
-              <h4 className="mb-3">{selectedEstate?.name} ({selectedEstate?.symbol})</h4>
+            <div className="estate-details-content">
+              <div className="estate-title-section">
+                <h3>{selectedEstate?.name} <span className="estate-symbol">({selectedEstate?.symbol})</span></h3>
+                <div className="estate-location">
+                  <FontAwesomeIcon icon={faBuilding} className="me-2" />
+                  {estateOwnerDetails.city || estateOwnerDetails.state}, {estateOwnerDetails.country}
+                </div>
+              </div>
 
-              <Table responsive bordered hover>
-                <tbody>
-                  <tr>
-                    <th>Estate Owner Name</th>
-                    <td>{estateOwnerDetails.name}</td>
-                  </tr>
-                  <tr>
-                    <th>ETH Address</th>
-                    <td>{estateOwnerDetails.ethAddress}</td>
-                  </tr>
-                  <tr>
-                    <th>Tokenized Real Estate Address</th>
-                    <td>{selectedEstate?.address}</td>
-                  </tr>
-                  <tr>
-                    <th>Country</th>
-                    <td>{estateOwnerDetails.country}</td>
-                  </tr>
-                  <tr>
-                    <th>State</th>
-                    <td>{estateOwnerDetails.state}</td>
-                  </tr>
-                  <tr>
-                    <th>Address</th>
-                    <td>{estateOwnerDetails.address}</td>
-                  </tr>
-                  <tr>
-                    <th>Real Estate Information</th>
-                    <td>{estateOwnerDetails.realEstateInfo}</td>
-                  </tr>
-                  {chainId === 43113 &&
-                    <tr>
-                      <th>Estate Value</th>
-                      <td>
-                        {estateOwnerDetails.currentEstateCost} {selectedEstate?.paymentTokenSymbol}
-                      </td>
-                    </tr>
-                  }
-                  {chainId === 43113 &&
-                    <tr>
-                      <th>Rewards Streamed</th>
-                      <td>
-                        {estateOwnerDetails.rewards} {selectedEstate?.paymentTokenSymbol}
-                      </td>
-                    </tr>
-                  }
-                  <tr>
-                    <th>Payment Token</th>
-                    <td>{selectedEstate?.paymentTokenSymbol}
-                      {estateOwnerDetails.token ? ` (${estateOwnerDetails.token})` : ''}
-                    </td>
-                  </tr>
-                  <tr>
-                    <th>Tokenization Percentage</th>
-                    <td>{estateOwnerDetails.percentageToTokenize}%</td>
-                  </tr>
-                  <tr>
-                    <th>Verification Status</th>
-                    <td>
-                      {estateOwnerDetails.isVerified ? (
-                        <span className="text-success">Verified</span>
-                      ) : (
-                        <span className="text-warning">Pending Verification</span>
-                      )}
-                    </td>
-                  </tr>
-                </tbody>
-              </Table>
+              <div className="details-grid">
+                <div className="detail-card owner-card">
+                  <div className="detail-card-header">
+                    <h5>Owner Information</h5>
+                  </div>
+                  <div className="detail-card-body">
+                    <div className="detail-item">
+                      <div className="detail-label">Owner Name</div>
+                      <div className="detail-value">{estateOwnerDetails.name}</div>
+                    </div>
+                    <div className="detail-item">
+                      <div className="detail-label">ETH Address</div>
+                      <div className="detail-value address-value">{estateOwnerDetails.ethAddress}</div>
+                    </div>
+                    <div className="detail-item">
+                      <div className="detail-label">Verification</div>
+                      <div className="detail-value">
+                        {estateOwnerDetails.isVerified ? (
+                          <Badge bg="success">Verified</Badge>
+                        ) : (
+                          <Badge bg="warning">Pending</Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="detail-card property-card">
+                  <div className="detail-card-header">
+                    <h5>Property Information</h5>
+                  </div>
+                  <div className="detail-card-body">
+                    <div className="detail-item">
+                      <div className="detail-label">Address</div>
+                      <div className="detail-value">{estateOwnerDetails.address}</div>
+                    </div>
+                    <div className="detail-item">
+                      <div className="detail-label">Description</div>
+                      <div className="detail-value">{estateOwnerDetails.realEstateInfo}</div>
+                    </div>
+                    <div className="detail-item">
+                      <div className="detail-label">Contract Address</div>
+                      <div className="detail-value address-value">{selectedEstate?.address}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="detail-card financials-card">
+                  <div className="detail-card-header">
+                    <h5>Financial Details</h5>
+                  </div>
+                  <div className="detail-card-body">
+                    {chainId === 43113 &&
+                      <div className="detail-item">
+                        <div className="detail-label">Estate Value</div>
+                        <div className="detail-value highlight">
+                          {estateOwnerDetails.currentEstateCost} {selectedEstate?.paymentTokenSymbol}
+                        </div>
+                      </div>
+                    }
+                    <div className="detail-item">
+                      <div className="detail-label">Payment Token</div>
+                      <div className="detail-value">
+                        {selectedEstate?.paymentTokenSymbol}
+                        {estateOwnerDetails.token ? ` (${estateOwnerDetails.token.substring(0, 6)}...${estateOwnerDetails.token.substring(estateOwnerDetails.token.length - 4)})` : ''}
+                      </div>
+                    </div>
+                    <div className="detail-item">
+                      <div className="detail-label">Tokenization %</div>
+                      <div className="detail-value">{estateOwnerDetails.percentageToTokenize}%</div>
+                    </div>
+                    {chainId === 43113 &&
+                      <div className="detail-item">
+                        <div className="detail-label">Rewards Streamed</div>
+                        <div className="detail-value highlight">
+                          {estateOwnerDetails.rewards} {selectedEstate?.paymentTokenSymbol}
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             <Alert variant="warning">Failed to load estate owner details.</Alert>
           )}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDetailsModal(false)}>
+          <Button variant="primary" onClick={() => setShowDetailsModal(false)} className="btn-close-modal">
             Close
           </Button>
         </Modal.Footer>
       </Modal>
 
       {/* Transaction History Modal */}
-      <Modal show={showTransactionHistoryModal} onHide={() => setShowTransactionHistoryModal(false)} centered size="lg">
-        <Modal.Header closeButton className="bg-light">
+      <Modal show={showTransactionHistoryModal} onHide={() => setShowTransactionHistoryModal(false)} centered size="lg" className="history-modal">
+        <Modal.Header closeButton className="history-modal-header">
           <Modal.Title>
-            <FontAwesomeIcon icon={faHistory} className="me-2 text-dark" />
-            Your Transaction History - {selectedEstate?.name} ({selectedEstate?.symbol})
+            <FontAwesomeIcon icon={faHistory} className="me-2" />
+            Transaction History - {selectedEstate?.name} ({selectedEstate?.symbol})
           </Modal.Title>
         </Modal.Header>
-        <Modal.Body>
+        <Modal.Body className="history-modal-body">
           {loadingTransactionHistory ? (
             <div className="text-center py-4">
-              <Spinner animation="border" role="status">
-                <span className="visually-hidden">Loading transaction history...</span>
-              </Spinner>
+              <div className="custom-spinner"></div>
+              <p className="mt-3">Loading transaction history...</p>
             </div>
           ) : transactionHistory && transactionHistory.length > 0 ? (
             <>
-              <div className="d-flex justify-content-end mb-3">
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <div className="history-summary">
+                  <span className="history-count">{transactionHistory.length}</span> transactions found
+                </div>
                 <Button
                   variant="success"
                   size="sm"
                   onClick={exportToExcel}
-                  className="download-btn"
+                  className="export-btn"
                 >
                   <FontAwesomeIcon icon={faDownload} className="me-2" />
                   Export Excel
                 </Button>
               </div>
-              <Table responsive bordered hover>
-                <thead className="bg-light">
-                  <tr>
-                    <th>Date</th>
-                    <th>Transaction Type</th>
-                    <th>Amount</th>
-                    <th>Token</th>
-                    <th className="text-center">Transaction Hash</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactionHistory.map((transaction, index) => (
-                    <tr key={index}>
-                      <td>{formatDate(transaction.createdAt)}</td>
-                      <td>
-                        <span className={`badge bg-${getTransactionBadgeColor(transaction.transactionType)}`}>
-                          {transaction.transactionType}
-                        </span>
-                      </td>
-                      <td>{transaction.transactionAmount}</td>
-                      <td>{transaction.transactionSymbol}</td>
-                      <td className="text-center">
-                        <Button 
-                          variant="outline-info" 
-                          size="sm"
-                          onClick={() => window.open(getBlockExplorerUrl(transaction.transactionHash, true), '_blank')}
-                          title="View transaction on blockchain explorer"
-                        >
-                          View Transaction
-                        </Button>
-                      </td>
+              <div className="transaction-table-wrapper">
+                <Table responsive bordered hover className="transaction-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Type</th>
+                      <th>Amount</th>
+                      <th>Token</th>
+                      <th className="text-center">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </Table>
+                  </thead>
+                  <tbody>
+                    {transactionHistory.map((transaction, index) => (
+                      <tr key={index}>
+                        <td>{formatDate(transaction.createdAt)}</td>
+                        <td>
+                          <span className={`badge bg-${getTransactionBadgeColor(transaction.transactionType)}`}>
+                            {transaction.transactionType}
+                          </span>
+                        </td>
+                        <td>{transaction.transactionAmount}</td>
+                        <td>{transaction.transactionSymbol}</td>
+                        <td className="text-center">
+                          <Button 
+                            variant="outline-info" 
+                            size="sm"
+                            onClick={() => window.open(getBlockExplorerUrl(transaction.transactionHash, true), '_blank')}
+                            title="View transaction on blockchain explorer"
+                            className="transaction-view-btn"
+                          >
+                            View Transaction
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
             </>
           ) : (
-            <Alert variant="info">
-              No transaction history found for this tokenized real estate.
-            </Alert>
+            <div className="empty-history">
+              <div className="empty-history-icon">
+                <FontAwesomeIcon icon={faHistory} />
+              </div>
+              <h4>No Transaction History</h4>
+              <p>You haven't made any transactions with this property yet</p>
+            </div>
           )}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowTransactionHistoryModal(false)}>
+          <Button variant="secondary" onClick={() => setShowTransactionHistoryModal(false)} className="btn-close-modal">
             Close
           </Button>
         </Modal.Footer>
       </Modal>
 
       <style jsx="true">{`
-        .btn-action {
-          min-width: 110px;
-          border-radius: 8px;
-          font-weight: 500;
-          transition: all 0.2s ease;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        .user-dashboard {
+          background-color: #f8fafc;
+          border-radius: 12px;
+          min-height: 100vh;
         }
-        .btn-action:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        
+        .dashboard-header {
+          background: linear-gradient(135deg, #1a5276 0%, #3498db 100%);
+          color: white;
+          padding: 2.5rem 1rem;
+          margin-bottom: 2rem;
+          border-radius: 12px;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+          position: relative;
+          overflow: hidden;
         }
-        .btn-network {
-          min-width: 180px;
-          border-radius: 20px;
-          font-weight: 500;
+        
+        .dashboard-header::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+          z-index: 0;
+        }
+        
+        .dashboard-header-content {
+          position: relative;
+          z-index: 1;
+          max-width: 1200px;
+          margin: 0 auto;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+        
+        .dashboard-title h2 {
+          font-size: 2.5rem;
+          font-weight: 800;
+          margin-bottom: 0.5rem;
+          color: white;
+          text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+          margin-left: -8px;
+        }
+        
+        .dashboard-title p {
+          font-size: 1.1rem;
+          opacity: 0.9;
+          margin-bottom: 0;
+          max-width: 500px;
+        }
+        
+        .dashboard-stats {
+          display: flex;
+          gap: 1.5rem;
+        }
+        
+        .stat-item {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(10px);
+          padding: 1rem 1.5rem;
+          border-radius: 12px;
+          min-width: 130px;
           transition: all 0.3s ease;
+          display: flex;
+          align-items: center;
         }
-        .btn-network.active {
-          box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        }
-        .btn-network:hover:not(:disabled) {
-          transform: translateY(-2px);
-        }
-        .form-control-modern {
-          border-radius: 8px;
-          border: 1px solid #ced4da;
-          padding: 10px 15px;
-        }
-        .network-switcher {
-          margin-top: 10px;
-        }
-        .card {
-          transition: all 0.3s ease;
-        }
-        .card:hover {
+        
+        .stat-item:hover {
           transform: translateY(-5px);
-          box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+          background: rgba(255, 255, 255, 0.2);
         }
-        .estate-details {
-          padding: 10px;
+        
+        .stat-icon {
+          font-size: 2rem;
+          margin-right: 1rem;
+          opacity: 0.8;
         }
-        .estate-details h4 {
+        
+        .stat-value {
+          font-size: 1.5rem;
+          font-weight: 700;
+          line-height: 1.1;
+        }
+        
+        .stat-label {
+          font-size: 0.8rem;
+          opacity: 0.8;
+        }
+        
+        .dashboard-alert {
+          margin: 0 1rem 1.5rem;
+          border-radius: 10px;
+          display: flex;
+          align-items: center;
+        }
+        
+        .network-switcher-section {
+          background: white;
+          border-radius: 12px;
+          padding: 1.5rem;
+          margin: 0 1rem 2rem;
+          box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+        }
+        
+        .section-title {
+          color: #2c3e50;
+          font-weight: 700;
+          font-size: 1.5rem;
+          margin-bottom: 1rem;
+          position: relative;
+          display: inline-block;
+        }
+        
+        .section-title::after {
+          content: '';
+          position: absolute;
+          width: 50%;
+          height: 3px;
+          background: linear-gradient(to right, #3498db, transparent);
+          bottom: -8px;
+          left: 0;
+          border-radius: 3px;
+        }
+        
+        .network-description {
+          color: #7f8c8d;
+          font-size: 0.9rem;
+          margin-top: 1rem;
+        }
+        
+        .btn-network {
+          border-radius: 30px;
+          padding: 0.6rem 1.2rem;
+          font-weight: 600;
+          transition: all 0.3s ease;
+          min-width: 180px;
+        }
+        
+        .btn-network.active {
+          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn-network:hover:not(:disabled) {
+          transform: translateY(-3px);
+          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .properties-grid {
+          padding: 0 0.5rem;
+        }
+        
+        .property-card {
+          border: none;
+          border-radius: 16px;
+          overflow: hidden;
+          transition: all 0.3s ease;
+          height: 100%;
+          background: white;
+          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        }
+        
+        .property-card:hover {
+          transform: translateY(-10px);
+          box-shadow: 0 12px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .property-header {
+          background: linear-gradient(45deg, #3498db, #1a5276);
+          color: white;
+          padding: 1.5rem;
+          position: relative;
+        }
+        
+        .property-id {
+          position: absolute;
+          top: 1rem;
+          right: 1rem;
+          font-weight: 500;
+          font-size: 0.8rem;
+        }
+        
+        .property-name {
+          font-size: 1.4rem;
+          font-weight: 700;
+          margin-bottom: 0.2rem;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        
+        .property-symbol {
+          font-size: 0.9rem;
+          opacity: 0.8;
+          margin-bottom: 1rem;
+        }
+        
+        .property-owner {
+          font-size: 0.8rem;
+          background: rgba(255, 255, 255, 0.2);
+          display: inline-block;
+          padding: 0.3rem 0.7rem;
+          border-radius: 50px;
+        }
+        
+        .owner-label {
+          opacity: 0.9;
+          margin-right: 0.5rem;
+        }
+        
+        .owner-address {
+          font-family: monospace;
+          font-weight: 500;
+        }
+        
+        .property-stats {
+          margin-bottom: 1.5rem;
+        }
+        
+        .stat-row {
+          display: flex;
+          justify-content: space-between;
+          padding: 0.6rem 0;
+          border-bottom: 1px solid #f1f3f5;
+        }
+        
+        .stat-row:last-child {
+          border-bottom: none;
+        }
+        
+        .stat-row.highlight {
+          background-color: rgba(52, 152, 219, 0.05);
+          margin: 0 -1.25rem;
+          padding: 0.6rem 1.25rem;
+          font-weight: 600;
+        }
+        
+        .stat-name {
+          color: #7f8c8d;
+          font-size: 0.9rem;
+        }
+        
+        .stat-value {
+          color: #2c3e50;
+          font-weight: 500;
+        }
+        
+        .property-actions {
+          padding-top: 1rem;
+          border-top: 1px solid #f1f3f5;
+        }
+        
+        .action-buttons {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 0.75rem;
+        }
+        
+        .btn-action {
+          border-radius: 8px;
+          font-weight: 500;
+          transition: all 0.3s ease;
+        }
+        
+        .btn-action:hover:not(:disabled) {
+          transform: translateY(-3px);
+        }
+        
+        .btn-claim {
+          width: 100%;
+        }
+        
+        /* Modals styling */
+        .user-dashboard-modal .modal-content {
+          border-radius: 16px;
+          overflow: hidden;
+          border: none;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        
+        .modal-header-custom {
+          background: linear-gradient(45deg, #3498db, #2c3e50);
+          color: white;
+          border-bottom: none;
+        }
+        
+        .modal-header-custom .modal-title {
+          font-weight: 700;
+        }
+        
+        .modal-header-custom .btn-close {
+          color: white;
+          box-shadow: none;
+          filter: invert(1) grayscale(100%) brightness(200%);
+        }
+        
+        .form-control-modern {
+          border-radius: 10px;
+          padding: 0.8rem 1rem;
+          border: 2px solid #e9ecef;
+          box-shadow: none;
+          transition: all 0.3s ease;
+        }
+        
+        .form-control-modern:focus {
+          border-color: #3498db;
+          box-shadow: 0 0 0 0.25rem rgba(52, 152, 219, 0.2);
+        }
+        
+        /* Claim rewards modal */
+        .rewards-info-box {
+          background: rgba(52, 152, 219, 0.05);
+          border-radius: 12px;
+          padding: 1.5rem;
+          display: flex;
+          align-items: center;
+        }
+        
+        .rewards-icon {
+          font-size: 2.5rem;
+          color: #3498db;
+          margin-right: 1rem;
+        }
+        
+        .rewards-details h5 {
+          font-weight: 700;
+          color: #2c3e50;
+          margin-bottom: 0.5rem;
+        }
+        
+        .rewards-details p {
+          margin-bottom: 0;
+          font-size: 0.9rem;
+          color: #7f8c8d;
+        }
+        
+        .rewards-amount {
+          text-align: center;
+          font-size: 2rem;
+          font-weight: 700;
+          color: #2c3e50;
+          padding: 1.5rem;
+          background: #f8f9fa;
+          border-radius: 10px;
+          margin-bottom: 0.5rem;
+        }
+        
+        /* Custom spinner */
+        .custom-spinner {
+          width: 50px;
+          height: 50px;
+          border: 5px solid rgba(52, 152, 219, 0.1);
+          border-radius: 50%;
+          border-top-color: #3498db;
+          animation: spin 1s ease-in-out infinite;
+          margin: 0 auto;
+        }
+        
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+          color: #7f8c8d;
+          font-weight: 500;
+        }
+        
+        /* Empty state */
+        .empty-state {
+          background: white;
+          border-radius: 16px;
+          padding: 3rem 2rem;
+          text-align: center;
+          margin: 2rem;
+          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        }
+        
+        .empty-icon {
+          font-size: 4rem;
+          color: #bdc3c7;
+          margin-bottom: 1.5rem;
+        }
+        
+        .empty-state h4 {
+          color: #2c3e50;
+          font-weight: 700;
+          margin-bottom: 0.5rem;
+        }
+        
+        .empty-state p {
+          color: #7f8c8d;
+        }
+        
+        /* Details modal */
+        .details-modal .modal-content {
+          border-radius: 16px;
+          border: none;
+        }
+        
+        .details-modal-header {
+          background: linear-gradient(45deg, #3498db, #2c3e50);
+          color: white;
+          padding: 1.5rem;
+          border-bottom: none;
+        }
+        
+        .details-modal-body {
+          padding: 2rem;
+        }
+        
+        .estate-title-section {
+          margin-bottom: 1.5rem;
+          padding-bottom: 1.5rem;
+          border-bottom: 1px solid #eee;
+        }
+        
+        .estate-title-section h3 {
+          color: #2c3e50;
+          font-weight: 700;
+          margin-bottom: 0.5rem;
+        }
+        
+        .estate-symbol {
+          color: #7f8c8d;
+          font-weight: normal;
+        }
+        
+        .estate-location {
+          color: #7f8c8d;
+          font-size: 1rem;
+        }
+        
+        .details-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+          gap: 1.5rem;
+        }
+        
+        .detail-card {
+          background: #f8f9fa;
+          border-radius: 12px;
+          overflow: hidden;
+        }
+        
+        .detail-card-header {
+          background: #f1f3f5;
+          padding: 1rem 1.5rem;
+        }
+        
+        .detail-card-header h5 {
+          margin-bottom: 0;
           color: #2c3e50;
           font-weight: 600;
         }
-        .download-btn {
-          border-radius: 6px;
-          font-weight: 500;
-          transition: all 0.2s ease;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        
+        .detail-card-body {
+          padding: 1.5rem;
         }
-        .download-btn:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        
+        .detail-item {
+          margin-bottom: 1rem;
+          padding-bottom: 1rem;
+          border-bottom: 1px solid #eee;
+        }
+        
+        .detail-item:last-child {
+          margin-bottom: 0;
+          padding-bottom: 0;
+          border-bottom: none;
+        }
+        
+        .detail-label {
+          color: #7f8c8d;
+          font-size: 0.8rem;
+          margin-bottom: 0.25rem;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        
+        .detail-value {
+          color: #2c3e50;
+          font-weight: 500;
+          word-break: break-word;
+        }
+        
+        .detail-value.address-value {
+          font-family: monospace;
+          font-size: 0.9rem;
+          background: #f1f3f5;
+          padding: 0.5rem;
+          border-radius: 6px;
+        }
+        
+        .highlight {
+          color: #3498db;
+          font-weight: 700;
+        }
+        
+        /* History modal */
+        .history-modal .modal-content {
+          border-radius: 16px;
+          border: none;
+        }
+        
+        .history-modal-header {
+          background: linear-gradient(45deg, #34495e, #2c3e50);
+          color: white;
+          padding: 1.5rem;
+          border-bottom: none;
+        }
+        
+        .history-modal-body {
+          padding: 2rem;
+        }
+        
+        .history-summary {
+          color: #7f8c8d;
+          font-size: 0.9rem;
+        }
+        
+        .history-count {
+          color: #2c3e50;
+          font-weight: 700;
+          font-size: 1.1rem;
+        }
+        
+        .export-btn {
+          border-radius: 8px;
+          font-weight: 500;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+        
+        .transaction-table-wrapper {
+          max-height: 400px;
+          overflow-y: auto;
+        }
+        
+        .transaction-table thead th {
+          background: #f8f9fa;
+          color: #2c3e50;
+          font-weight: 600;
+          border-top: none;
+          position: sticky;
+          top: 0;
+          z-index: 10;
+        }
+        
+        .transaction-view-btn {
+          border-radius: 50px;
+          padding: 0.25rem 0.75rem;
+          font-size: 0.8rem;
+          font-weight: 500;
+        }
+        
+        .empty-history {
+          text-align: center;
+          padding: 3rem 2rem;
+        }
+        
+        .empty-history-icon {
+          font-size: 4rem;
+          color: #bdc3c7;
+          margin-bottom: 1.5rem;
+        }
+        
+        .empty-history h4 {
+          color: #2c3e50;
+          font-weight: 700;
+          margin-bottom: 0.5rem;
+        }
+        
+        .empty-history p {
+          color: #7f8c8d;
+        }
+        
+        .btn-close-modal {
+          border-radius: 8px;
+          font-weight: 500;
+          padding-left: 2rem;
+          padding-right: 2rem;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 992px) {
+          .dashboard-header-content {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+          
+          .dashboard-stats {
+            margin-top: 1.5rem;
+            width: 100%;
+            justify-content: space-between;
+          }
+          
+          .stat-item {
+            min-width: 100px;
+          }
+          
+          .details-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+        
+        @media (max-width: 768px) {
+          .dashboard-title h2 {
+            font-size: 2rem;
+          }
+          
+          .dashboard-title p {
+            font-size: 1rem;
+          }
+          
+          .dashboard-stats {
+            flex-wrap: wrap;
+            gap: 1rem;
+          }
+          
+          .stat-item {
+            flex-basis: calc(50% - 0.5rem);
+            padding: 0.75rem 1rem;
+          }
+          
+          .stat-icon {
+            font-size: 1.5rem;
+          }
+          
+          .stat-value {
+            font-size: 1.2rem;
+          }
+          
+          .property-actions .action-buttons {
+            grid-template-columns: 1fr;
+          }
+          
+          .network-switcher {
+            margin-top: 1rem;
+          }
+          
+          .btn-network {
+            width: 100%;
+            margin-bottom: 0.5rem;
+          }
+        }
+        
+        @media (max-width: 576px) {
+          .action-buttons {
+            grid-template-columns: 1fr;
+          }
         }
       `}</style>
     </div>

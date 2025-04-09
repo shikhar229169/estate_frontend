@@ -1136,7 +1136,7 @@ const EstateOwnerDashboard = ({ walletAddress, chainId }) => {
                       variant="success"
                       size="sm"
                       onClick={exportAnalyticsToExcel}
-                      className="download-btn"
+                      className="btn-group me-2"
                       title="Export analytics data to Excel"
                     >
                       <FontAwesomeIcon icon={faDownload} className="me-2" />

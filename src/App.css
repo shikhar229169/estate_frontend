@@ -1913,3 +1913,528 @@ body {
     max-width: 200px;
   }
 }
+
+/* Enhanced Estate Owner Dashboard Styling */
+.estate-owner-dashboard {
+  background-color: #f8f9fa;
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.estate-owner-dashboard h2 {
+  color: #344767;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  position: relative;
+  display: inline-block;
+}
+
+.estate-owner-dashboard h2:after {
+  content: '';
+  position: absolute;
+  width: 60px;
+  height: 4px;
+  background: linear-gradient(to right, #3498db, #1a5276);
+  bottom: -10px;
+  left: 0;
+  border-radius: 2px;
+}
+
+/* Enhanced tab styling */
+.estate-owner-dashboard .nav-tabs {
+  border-bottom: 1px solid #e9ecef;
+  margin-bottom: 1.5rem;
+}
+
+.estate-owner-dashboard .nav-tabs .nav-link {
+  border: none;
+  color: #7f8c8d;
+  font-weight: 500;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0;
+  margin-right: 1rem;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.estate-owner-dashboard .nav-tabs .nav-link:hover {
+  color: #3498db;
+}
+
+.estate-owner-dashboard .nav-tabs .nav-link.active {
+  color: #3498db;
+  font-weight: 600;
+  background-color: transparent;
+}
+
+.estate-owner-dashboard .nav-tabs .nav-link.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(to right, #3498db, #1a5276);
+  border-top-left-radius: 3px;
+  border-top-right-radius: 3px;
+}
+
+/* Enhanced Card Styling */
+.estate-owner-dashboard .card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  overflow: hidden;
+  margin-bottom: 2rem;
+}
+
+.estate-owner-dashboard .card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.estate-owner-dashboard .card-body {
+  padding: 1.8rem;
+}
+
+.estate-owner-dashboard .card h4 {
+  color: #344767;
+  font-weight: 700;
+  font-size: 1.4rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+  padding-bottom: 12px;
+}
+
+.estate-owner-dashboard .card h4::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 50px;
+  height: 3px;
+  background: linear-gradient(to right, #3498db, #1a5276);
+  border-radius: 3px;
+}
+
+/* Enhanced Table Styling */
+.estate-owner-dashboard .table {
+  margin-bottom: 0;
+}
+
+.estate-owner-dashboard .table th {
+  font-weight: 600;
+  color: #344767;
+  background-color: #f8f9fa;
+  border-top: none;
+  padding: 1rem;
+}
+
+.estate-owner-dashboard .table td {
+  padding: 1rem;
+  vertical-align: middle;
+  color: #495057;
+  border-color: #f1f3f4;
+}
+
+.estate-owner-dashboard .table-bordered th,
+.estate-owner-dashboard .table-bordered td {
+  border: 1px solid #f1f3f4;
+}
+
+.estate-owner-dashboard .table-hover tbody tr:hover {
+  background-color: rgba(52, 152, 219, 0.05);
+}
+
+/* Estate Info Highlights */
+.estate-key-value {
+  display: flex;
+  border-bottom: 1px solid #f1f3f4;
+  padding: 0.8rem 0;
+}
+
+.estate-key-value:last-child {
+  border-bottom: none;
+}
+
+.estate-info-key {
+  font-weight: 600;
+  color: #7f8c8d;
+  width: 35%;
+}
+
+.estate-info-value {
+  color: #344767;
+  font-weight: 500;
+}
+
+/* Token Details Card */
+.token-details-card {
+  border-left: 5px solid #3498db;
+}
+
+.token-detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem 0;
+  border-bottom: 1px solid #f1f3f4;
+  align-items: center;
+}
+
+.token-detail-row:last-child {
+  border-bottom: none;
+}
+
+.token-detail-label {
+  color: #7f8c8d;
+  font-weight: 500;
+}
+
+.token-detail-value {
+  color: #344767;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* Enhanced Alert Styling */
+.estate-owner-dashboard .alert {
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  border: none;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.estate-owner-dashboard .alert-info {
+  background-color: rgba(52, 152, 219, 0.1);
+  color: #2980b9;
+  border-left: 5px solid #3498db;
+}
+
+.estate-owner-dashboard .alert-danger {
+  background-color: rgba(231, 76, 60, 0.1);
+  color: #c0392b;
+  border-left: 5px solid #e74c3c;
+}
+
+.estate-owner-dashboard .alert-success {
+  background-color: rgba(46, 204, 113, 0.1);
+  color: #27ae60;
+  border-left: 5px solid #2ecc71;
+}
+
+.estate-owner-dashboard .alert-icon {
+  font-size: 1.5rem;
+  margin-right: 1rem;
+}
+
+/* Enhanced Button Styling */
+.estate-owner-dashboard .btn {
+  border-radius: 8px;
+  padding: 0.6rem 1.2rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.estate-owner-dashboard .btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+}
+
+.estate-owner-dashboard .btn-primary {
+  background: linear-gradient(45deg, #3498db, #2980b9);
+  border: none;
+}
+
+.estate-owner-dashboard .btn-info {
+  background: linear-gradient(45deg, #00cdac, #02aab0);
+  border: none;
+  color: white;
+}
+
+.estate-owner-dashboard .btn-info:hover {
+  color: white;
+}
+
+.estate-owner-dashboard .btn-success {
+  background: linear-gradient(45deg, #2ecc71, #27ae60);
+  border: none;
+}
+
+.estate-owner-dashboard .btn-outline-info {
+  color: #3498db;
+  border-color: #3498db;
+}
+
+.estate-owner-dashboard .btn-outline-info:hover {
+  background-color: #3498db;
+  color: white;
+}
+
+/* Verification Status */
+.verification-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-radius: 50px;
+  font-weight: 600;
+}
+
+.verification-status.verified {
+  background-color: rgba(46, 204, 113, 0.1);
+  color: #27ae60;
+}
+
+.verification-status.pending {
+  background-color: rgba(243, 156, 18, 0.1);
+  color: #f39c12;
+}
+
+.verification-status-icon {
+  margin-right: 0.5rem;
+}
+
+/* Modal Styling */
+.estate-modal .modal-content {
+  border-radius: 15px;
+  border: none;
+  overflow: hidden;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+}
+
+.estate-modal .modal-header {
+  background: linear-gradient(45deg, #3498db, #2980b9);
+  color: white;
+  padding: 1.5rem;
+  border-bottom: none;
+}
+
+.estate-modal .modal-title {
+  font-weight: 700;
+}
+
+.estate-modal .modal-body {
+  padding: 1.8rem;
+}
+
+.estate-modal .modal-footer {
+  border-top: 1px solid #f1f3f4;
+  padding: 1rem 1.5rem;
+}
+
+.estate-modal .close {
+  color: white;
+  opacity: 0.8;
+}
+
+.estate-modal .close:hover {
+  opacity: 1;
+}
+
+/* Form Controls in Modal */
+.estate-modal .form-label {
+  font-weight: 600;
+  color: #344767;
+  margin-bottom: 0.5rem;
+}
+
+.estate-modal .form-control {
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  border: 2px solid #e9ecef;
+  transition: all 0.3s ease;
+}
+
+.estate-modal .form-control:focus {
+  border-color: #3498db;
+  box-shadow: 0 0 0 0.25rem rgba(52, 152, 219, 0.1);
+}
+
+.estate-modal .form-text {
+  color: #7f8c8d;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+/* Loading Spinner */
+.estate-owner-dashboard .spinner-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem 0;
+}
+
+.estate-owner-dashboard .spinner-border {
+  color: #3498db;
+  width: 3rem;
+  height: 3rem;
+}
+
+/* User Data Table */
+.user-data-table thead {
+  background-color: #f8f9fa;
+}
+
+.user-data-table th {
+  font-weight: 600;
+  color: #344767;
+}
+
+.user-data-table .badge {
+  padding: 0.5rem 0.8rem;
+  font-weight: 500;
+  border-radius: 6px;
+}
+
+.download-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  background: linear-gradient(45deg, #27ae60, #2ecc71);
+  border: none;
+  color: white;
+  box-shadow: 0 3px 10px rgba(46, 204, 113, 0.2);
+  transition: all 0.3s ease;
+}
+
+.download-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(46, 204, 113, 0.3);
+  background: linear-gradient(45deg, #219955, #27ae60);
+  color: white;
+}
+
+/* Address display */
+.address-container {
+  display: inline-block;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+  font-family: monospace;
+  background-color: #f8f9fa;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 992px) {
+  .estate-owner-dashboard .card-body {
+    padding: 1.5rem;
+  }
+  
+  .estate-info-key {
+    width: 40%;
+  }
+}
+
+@media (max-width: 768px) {
+  .estate-owner-dashboard {
+    padding: 1rem;
+  }
+  
+  .estate-owner-dashboard .nav-tabs .nav-link {
+    padding: 0.6rem 1rem;
+    margin-right: 0.5rem;
+  }
+  
+  .estate-info-key {
+    width: 50%;
+  }
+  
+  .token-detail-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .token-detail-value {
+    text-align: left;
+    margin-top: 0.25rem;
+  }
+}
+
+/* Enhanced User Dashboard Styles */
+.user-dashboard {
+  font-family: 'Roboto', sans-serif;
+}
+
+.user-dashboard .card {
+  transition: all 0.35s cubic-bezier(0.1, 0.6, 0.3, 1);
+}
+
+.user-dashboard .card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1) !important;
+}
+
+.user-dashboard .btn-action {
+  min-width: 110px;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.user-dashboard .btn-action:hover:not(:disabled) {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.user-dashboard .btn-action:hover:not(:disabled)::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -100%;
+  width: 60%;
+  height: 200%;
+  background: rgba(255,255,255,0.2);
+  transform: rotate(30deg);
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  to {
+    left: 150%;
+  }
+}
+
+.user-dashboard .table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.user-dashboard .table th {
+  font-weight: 600;
+  color: #344767;
+  background-color: #f8f9fa;
+}
+
+.user-dashboard .table-bordered th,
+.user-dashboard .table-bordered td {
+  border: 1px solid #eef2f7;
+}
+
+.user-dashboard .table-hover tbody tr:hover {
+  background-color: rgba(52, 152, 219, 0.05);
+}
+
+.user-dashboard .badge {
+  font-weight: 500;
+  padding: 0.45em 0.75em;
+  border-radius: 6px;
+}
+
+.user-dashboard .form-control:focus {
+  border-color: #3498db;
+  box-shadow: 0 0 0 0.25rem rgba(52, 152, 219, 0.2);
+}
