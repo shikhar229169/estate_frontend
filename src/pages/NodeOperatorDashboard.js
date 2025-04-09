@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Tab, Tabs, Card, Form, Button, Table, Alert, Spinner, Modal } from 'react-bootstrap';
+import { Tab, Tabs, Card, Form, Button, Table, Alert, Spinner, Modal, Row, Col, Badge, ProgressBar } from 'react-bootstrap';
 import { ethers } from 'ethers';
 import { getContracts, switchNetwork } from '../utils/interact';
 import { getEstateOwnersByNodeOperator, updateEstateOwnerByNode, getNodeOperatorByWalletAddress, updateNodeOperatorAutoUpdate, updateNodeOperatorClaimedRewards } from '../utils/api';
 import VerifyingOperatorVaultABI from '../contracts/abi/VerifyingOperatorVault';
+// Import FontAwesome icons
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCheckCircle, faTimesCircle, faInfoCircle, faClipboard, faCog, faChartLine, faUsers, 
+  faCoins, faHome, faNetworkWired, faUserShield, faExclamationTriangle, faEye, faMoneyBillWave, 
+  faToggleOn, faToggleOff, faArrowCircleUp, faArrowCircleDown, faCheck, faBalanceScale } from '@fortawesome/free-solid-svg-icons';
 
 const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
   const [activeTab, setActiveTab] = useState('verifyEstateOwners');
@@ -451,403 +456,875 @@ const NodeOperatorDashboard = ({ walletAddress, chainId }) => {
 
   return (
     <div className="node-operator-dashboard">
-      <h2 className="mb-4">Node Operator Dashboard</h2>
+      <h2 className="dashboard-title mb-4">
+        <FontAwesomeIcon icon={faUserShield} className="me-2" />
+        Node Operator Dashboard
+      </h2>
 
-      {error && <Alert variant="danger">{error}</Alert>}
-      {success && <Alert variant="success">{success}</Alert>}
+      {error && <Alert variant="danger" className="animated-alert">
+        <FontAwesomeIcon icon={faExclamationTriangle} className="me-2" />
+        {error}
+      </Alert>}
+      
+      {success && <Alert variant="success" className="animated-alert">
+        <FontAwesomeIcon icon={faCheckCircle} className="me-2" />
+        {success}
+      </Alert>}
 
       {loading && (
-        <div className="text-center mb-4">
-          <Spinner animation="border" role="status">
+        <div className="text-center mb-4 loader-container">
+          <Spinner animation="border" role="status" variant="primary">
             <span className="visually-hidden">Loading...</span>
           </Spinner>
+          <p className="mt-2 loading-text">Loading node operator data...</p>
         </div>
       )}
 
-      {!nodeOperatorInfo && (
-        <Card className="mb-4">
-          <Card.Body>
-            <h4>Register Operator Vault</h4>
-            <Form onSubmit={handleRegisterVault}>
-              <Form.Group className="mb-3">
-                <Form.Label>ENS Name</Form.Label>
-                <Form.Control
-                  type="text"
-                  name="ensName"
-                  value={registerVaultForm.ensName}
-                  onChange={(e) => handleInputChange(e, setRegisterVaultForm)}
-                  placeholder="your-ens-name.eth"
-                  required
-                />
-              </Form.Group>
-
-              <Form.Group className="mb-3">
-                <Form.Label>Collateral Amount</Form.Label>
-                <Form.Control
-                  type="number"
-                  name="collateralAmount"
-                  value={registerVaultForm.collateralAmount}
-                  onChange={(e) => handleInputChange(e, setRegisterVaultForm)}
-                  min="1"
-                  required
-                />
-              </Form.Group>
-
-              <Form.Group className="mb-3">
-                <Form.Label>Collateral Token</Form.Label>
-                <Form.Control
-                  type="text"
-                  name="collateralToken"
-                  value={registerVaultForm.collateralToken}
-                  onChange={(e) => handleInputChange(e, setRegisterVaultForm)}
-                  placeholder="0x... (leave empty for native token)"
-                />
-                <Form.Text className="text-muted">
-                  Leave empty to use native token (ETH/AVAX)
-                </Form.Text>
-              </Form.Group>
-
-              <Button variant="primary" type="submit" disabled={loading}>
-                Register Vault
-              </Button>
-            </Form>
-          </Card.Body>
-        </Card>
-      )}
-
-      {nodeOperatorInfo && (
-        <>
-          <Card className="mb-4">
-            <Card.Body>
-              <h4>Operator Vault Information</h4>
-              <Table responsive bordered>
-                <tbody>
-                  <tr>
-                    <th>ENS Name</th>
-                    <td>{nodeOperatorInfo.ensName}</td>
-                  </tr>
-                  <tr>
-                    <th>Vault Address</th>
-                    <td>{nodeOperatorInfo.vault}</td>
-                  </tr>
-                  <tr>
-                    <th>Collateral Token</th>
-                    <td>
-                      {nodeOperatorInfo.token === ethers.constants.AddressZero ?
-                        `Native ${tokenSymbol}` :
-                        `${tokenSymbol} (${nodeOperatorInfo.token})`
-                      }
-                    </td>
-                  </tr>
-                  <tr>
-                    <th>Collateral Amount</th>
-                    <td>
-                      {nodeOperatorInfo.stakedCollateralInToken ?
-                        `${formatTokenAmount(nodeOperatorInfo.stakedCollateralInToken)} ${tokenSymbol}`
-                        : 'Loading...'
-                      }
-                    </td>
-                  </tr>
-                  <tr>
-                    <th>Status</th>
-                    <td>{nodeOperatorInfo.isApproved ? 'Approved' : 'Pending Approval'}</td>
-                  </tr>
-                  <tr>
-                    <th>Claimable Rewards</th>
-                    <td>
-                      {formatTokenAmount(nodeOperatorInfo.claimableRewards)} {tokenSymbol}
-                      <Button
-                        variant={nodeOperatorInfo.claimableRewards.isZero() ? "warning" : "success"}
-                        size="sm"
-                        className="ms-2"
-                        onClick={handleClaimRewards}
-                        disabled={loading /*|| nodeOperatorInfo.claimableRewards.isZero()*/}
-                      >
-                        Claim Rewards
-                      </Button>
-                    </td>
-                  </tr>
-                  <tr>
-                    <th>Claimed Rewards</th>
-                    <td>{formatTokenAmount(nodeOperatorInfo.claimedRewards)} {tokenSymbol}</td>
-                  </tr>
-                  <tr>
-                    <th>Auto Update</th>
-                    <td>
-                      {autoUpdateEnabled ? 'Enabled' : 'Disabled'}
-                      <Button
-                        variant={autoUpdateEnabled ? "warning" : "success"}
-                        size="sm"
-                        className="ms-2"
-                        onClick={handleToggleAutoUpdate}
-                        disabled={loading}
-                      >
-                        {autoUpdateEnabled ? 'Disable' : 'Enable'} Auto Update
-                      </Button>
-                      {!autoUpdateEnabled && (
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          className="ms-2"
-                          onClick={handleForceUpgrade}
-                          disabled={loading}
-                        >
-                          Force Upgrade
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                </tbody>
-              </Table>
+      {!walletAddress ? (
+        <div className="text-center connect-wallet-card">
+          <Card className="shadow-sm border-0">
+            <Card.Body className="p-5">
+              <div className="mb-4 connection-icon">
+                <FontAwesomeIcon icon={faNetworkWired} size="3x" />
+              </div>
+              <h3>Please Connect Your Wallet</h3>
+              <p className="text-muted">Connect your wallet to access the Node Operator Dashboard</p>
             </Card.Body>
           </Card>
+        </div>
+      ) : !chainId ? (
+        <div className="text-center network-selection-card">
+          <Card className="shadow-sm border-0">
+            <Card.Body className="p-5">
+              <div className="mb-4 network-icon">
+                <FontAwesomeIcon icon={faNetworkWired} size="3x" />
+              </div>
+              <h3>Select a Network</h3>
+              <p className="text-muted mb-4">Please connect to a supported network</p>
+              <div className="d-flex justify-content-center">
+                <Button
+                  variant="outline-primary"
+                  className="me-3 network-btn fuji-btn"
+                  onClick={() => switchNetwork(43113)}
+                >
+                  <i className="network-icon fuji"></i>
+                  Switch to Fuji
+                </Button>
+                <Button
+                  variant="outline-primary"
+                  className="network-btn sepolia-btn"
+                  onClick={() => switchNetwork(11155111)}
+                >
+                  <i className="network-icon sepolia"></i>
+                  Switch to Sepolia
+                </Button>
+              </div>
+            </Card.Body>
+          </Card>
+        </div>
+      ) : !isRegistered ? (
+        <div className="text-center signup-card">
+          <Card className="shadow-sm border-0">
+            <Card.Body className="p-5">
+              <div className="mb-4 signup-icon">
+                <FontAwesomeIcon icon={faUserShield} size="3x" />
+              </div>
+              <h3>Not Registered</h3>
+              <p className="text-muted mb-4">You are not registered as a node operator. Please sign up first.</p>
+              <Button
+                variant="primary"
+                size="lg"
+                className="signup-btn"
+                onClick={() => window.location.href = '/node-operator-signup'}
+              >
+                Sign Up as Node Operator
+              </Button>
+            </Card.Body>
+          </Card>
+        </div>
+      ) : (
+        <>
+          {!nodeOperatorInfo ? (
+            <Card className="mb-4 shadow-sm border-0 register-vault-card">
+              <Card.Header className="bg-transparent border-bottom-0 pt-4">
+                <h4>
+                  <FontAwesomeIcon icon={faHome} className="me-2" />
+                  Register Operator Vault
+                </h4>
+              </Card.Header>
+              <Card.Body className="p-4">
+                <Form onSubmit={handleRegisterVault}>
+                  <Row>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>ENS Name</Form.Label>
+                        <div className="input-with-icon">
+                          <FontAwesomeIcon icon={faClipboard} className="input-icon" />
+                          <Form.Control
+                            type="text"
+                            name="ensName"
+                            value={registerVaultForm.ensName}
+                            onChange={(e) => handleInputChange(e, setRegisterVaultForm)}
+                            placeholder="your-ens-name.eth"
+                            required
+                            className="ps-4"
+                          />
+                        </div>
+                      </Form.Group>
+                    </Col>
+                    
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Collateral Amount</Form.Label>
+                        <div className="input-with-icon">
+                          <FontAwesomeIcon icon={faCoins} className="input-icon" />
+                          <Form.Control
+                            type="number"
+                            name="collateralAmount"
+                            value={registerVaultForm.collateralAmount}
+                            onChange={(e) => handleInputChange(e, setRegisterVaultForm)}
+                            min="1"
+                            required
+                            className="ps-4"
+                          />
+                        </div>
+                      </Form.Group>
+                    </Col>
+                  </Row>
 
-          <Tabs
-            activeKey={activeTab}
-            onSelect={(k) => setActiveTab(k)}
-            className="mb-4"
-          >
-            <Tab eventKey="verifyEstateOwners" title="Estate Owners">
-              <Card>
-                <Card.Body>
-                  <h4>Estate Owners</h4>
-                  <Table responsive striped bordered hover>
-                    <thead>
-                      <tr>
-                        <th>Name</th>
-                        <th>ETH Address</th>
-                        <th>Country</th>
-                        <th>Estate Value</th>
-                        <th>Tokenization %</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {estateOwners.map((owner, index) => (
-                        <tr key={index}>
-                          <td>{owner.name}</td>
-                          <td>{owner.ethAddress}</td>
-                          <td>{owner.country}</td>
-                          <td>{formatTokenAmount(owner.currentEstateCost)} {tokenSymbol}</td>
-                          <td>{owner.percentageToTokenize}%</td>
-                          <td>{owner.isVerified ? 'Verified' : (owner.isRejected ? 'Rejected' : 'Pending')}</td>
-                          <td>
-                            <Button
-                              variant="info"
-                              size="sm"
-                              className="me-2"
-                              onClick={() => handleViewDetails(owner)}
-                            >
-                              Details
-                            </Button>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Collateral Token</Form.Label>
+                    <div className="input-with-icon">
+                      <FontAwesomeIcon icon={faCoins} className="input-icon" />
+                      <Form.Control
+                        type="text"
+                        name="collateralToken"
+                        value={registerVaultForm.collateralToken}
+                        onChange={(e) => handleInputChange(e, setRegisterVaultForm)}
+                        placeholder="0x... (leave empty for native token)"
+                        className="ps-4"
+                      />
+                    </div>
+                    <Form.Text className="text-muted">
+                      Leave empty to use native token (ETH/AVAX)
+                    </Form.Text>
+                  </Form.Group>
 
-                            {!owner.isVerified && (
-                              <Button
-                                variant="success"
-                                size="sm"
-                                onClick={() => handleVerifyFromList(owner)}
-                              >
-                                Verify
-                              </Button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                      {estateOwners.length === 0 && (
-                        <tr>
-                          <td colSpan="7" className="text-center">No estate owners found</td>
-                        </tr>
+                  <div className="text-center mt-4">
+                    <Button variant="primary" type="submit" disabled={loading} className="px-5 py-2">
+                      {loading ? (
+                        <>
+                          <Spinner size="sm" animation="border" className="me-2" />
+                          Registering...
+                        </>
+                      ) : (
+                        <>Register Vault</>
                       )}
-                    </tbody>
-                  </Table>
-                </Card.Body>
-              </Card>
-            </Tab>
-
-            <Tab eventKey="verifyEstateOwner" title="Verify Estate Owner">
-              <Card>
-                <Card.Body>
-                  <h4>Verify Estate Owner</h4>
-                  <Form
-                    onSubmit={(e) => {
-                      handleVerifyEstateOwner(e);
-                    }}
-                  >
-                    <Form.Group className="mb-3">
-                      <Form.Label>Estate Owner Address</Form.Label>
-                      <Form.Control
-                        type="text"
-                        name="estateOwnerAddress"
-                        value={verifyEstateOwnerForm.estateOwnerAddress}
-                        onChange={(e) => handleInputChange(e, setVerifyEstateOwnerForm)}
-                        placeholder="0x..."
-                        required
-                      />
-                    </Form.Group>
-
-                    <Form.Group className="mb-3">
-                      <Form.Label>Estate Value</Form.Label>
-                      <Form.Control
-                        type="text"
-                        name="realEstateValue"
-                        value={verifyEstateOwnerForm.realEstateValue}
-                        onChange={(e) => {
-                          // Only allow numbers and decimal point
-                          if (/^\d*\.?\d*$/.test(e.target.value)) {
-                            handleInputChange(e, setVerifyEstateOwnerForm);
-                          }
-                        }}
-                        placeholder="Enter estate value"
-                        required
-                      />
-                      <Form.Text className="text-muted">
-                        Value in {tokenSymbol}
-                      </Form.Text>
-                    </Form.Group>
-
-                    <Form.Group className="mb-3">
-                      <Form.Label>Tokenization Percentage</Form.Label>
-                      <Form.Control
-                        type="number"
-                        name="tokenizationPercentage"
-                        value={verifyEstateOwnerForm.tokenizationPercentage}
-                        onChange={(e) => handleInputChange(e, setVerifyEstateOwnerForm)}
-                        min="1"
-                        max="100"
-                        required
-                      />
-                    </Form.Group>
-
-                    <Form.Group className="mb-3">
-                      <Form.Label>Token</Form.Label>
-                      <Form.Control
-                        type="text"
-                        name="token"
-                        value={verifyEstateOwnerForm.token}
-                        onChange={(e) => handleInputChange(e, setVerifyEstateOwnerForm)}
-                        placeholder="0x..."
-                        required
-                      />
-                    </Form.Group>
-
-                    <Button variant="primary" type="submit" disabled={loading || !nodeOperatorInfo?.isApproved}>
-                      Verify Estate Owner
                     </Button>
+                  </div>
+                </Form>
+              </Card.Body>
+            </Card>
+          ) : (
+            <>
+              <Row className="mb-4">
+                <Col lg={8}>
+                  <Card className="shadow-sm border-0 h-100 vault-info-card">
+                    <Card.Header className="bg-transparent pt-4 pb-2 border-0">
+                      <h4 className="mb-0">
+                        <FontAwesomeIcon icon={faHome} className="me-2" />
+                        Operator Vault Information
+                      </h4>
+                    </Card.Header>
+                    <Card.Body className="pb-4">
+                      <Table responsive bordered className="mb-0 custom-table">
+                        <tbody>
+                          <tr>
+                            <th className="bg-light"><FontAwesomeIcon icon={faClipboard} className="me-2" />ENS Name</th>
+                            <td>
+                              <div className="d-flex align-items-center">
+                                <span className="ens-badge me-2"></span>
+                                {nodeOperatorInfo.ensName}
+                              </div>
+                            </td>
+                          </tr>
+                          <tr>
+                            <th className="bg-light"><FontAwesomeIcon icon={faHome} className="me-2" />Vault Address</th>
+                            <td className="font-monospace small">{nodeOperatorInfo.vault}</td>
+                          </tr>
+                          <tr>
+                            <th className="bg-light"><FontAwesomeIcon icon={faCoins} className="me-2" />Collateral Token</th>
+                            <td>
+                              <Badge bg="light" text="dark" className="token-badge">
+                                {nodeOperatorInfo.token === ethers.constants.AddressZero ?
+                                  `Native ${tokenSymbol}` :
+                                  `${tokenSymbol} (${nodeOperatorInfo.token})`
+                                }
+                              </Badge>
+                            </td>
+                          </tr>
+                          <tr>
+                            <th className="bg-light"><FontAwesomeIcon icon={faBalanceScale} className="me-2" />Collateral Amount</th>
+                            <td>
+                              <div className="d-flex align-items-center">
+                                {nodeOperatorInfo.stakedCollateralInToken ?
+                                  `${formatTokenAmount(nodeOperatorInfo.stakedCollateralInToken)} ${tokenSymbol}`
+                                  : 'Loading...'
+                                }
+                              </div>
+                            </td>
+                          </tr>
+                          <tr>
+                            <th className="bg-light"><FontAwesomeIcon icon={faCheckCircle} className="me-2" />Status</th>
+                            <td>
+                              {nodeOperatorInfo.isApproved ? (
+                                <Badge bg="success" className="status-badge approved">
+                                  <FontAwesomeIcon icon={faCheckCircle} className="me-1" />
+                                  Approved
+                                </Badge>
+                              ) : (
+                                <Badge bg="warning" text="dark" className="status-badge pending">
+                                  <FontAwesomeIcon icon={faExclamationTriangle} className="me-1" />
+                                  Pending Approval
+                                </Badge>
+                              )}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </Table>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col lg={4}>
+                  <Card className="mb-3 shadow-sm border-0 rewards-card">
+                    <Card.Body className="p-4">
+                      <h5 className="card-subtitle">
+                        <FontAwesomeIcon icon={faMoneyBillWave} className="me-2" />
+                        Node Rewards
+                      </h5>
+                      <div className="rewards-section mt-3">
+                        <div className="mb-3">
+                          <div className="d-flex justify-content-between mb-1">
+                            <span className="text-muted">Claimable Rewards</span>
+                            <span className="fw-bold">{formatTokenAmount(nodeOperatorInfo.claimableRewards)} {tokenSymbol}</span>
+                          </div>
+                          <ProgressBar 
+                            now={nodeOperatorInfo.claimableRewards ? 
+                              (parseFloat(formatTokenAmount(nodeOperatorInfo.claimableRewards)) / 
+                              (parseFloat(formatTokenAmount(nodeOperatorInfo.claimableRewards)) + 
+                               parseFloat(formatTokenAmount(nodeOperatorInfo.claimedRewards)) || 1)) * 100 : 0} 
+                            variant="success" 
+                            className="rewards-progress"
+                          />
+                        </div>
+                        
+                        <div>
+                          <div className="d-flex justify-content-between mb-1">
+                            <span className="text-muted">Total Claimed</span>
+                            <span className="fw-bold">{formatTokenAmount(nodeOperatorInfo.claimedRewards)} {tokenSymbol}</span>
+                          </div>
+                        </div>
+                        
+                        <Button
+                          variant={nodeOperatorInfo.claimableRewards && !nodeOperatorInfo.claimableRewards.isZero() ? "success" : "outline-secondary"}
+                          className="w-100 mt-3 claim-btn"
+                          onClick={handleClaimRewards}
+                          disabled={loading}
+                        >
+                          {loading ? (
+                            <Spinner animation="border" size="sm" />
+                          ) : (
+                            <>
+                              <FontAwesomeIcon icon={faCoins} className="me-2" />
+                              {nodeOperatorInfo.claimableRewards && !nodeOperatorInfo.claimableRewards.isZero() ? 'Claim Rewards' : 'No Rewards to Claim'}
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                  
+                  <Card className="shadow-sm border-0 auto-update-card">
+                    <Card.Body className="p-4">
+                      <h5 className="card-subtitle">
+                        <FontAwesomeIcon icon={faCog} className="me-2" />
+                        Auto Update
+                      </h5>
+                      
+                      <div className="d-flex justify-content-between align-items-center mt-3">
+                        <span className="status-text">
+                          {autoUpdateEnabled ? (
+                            <>
+                              <FontAwesomeIcon icon={faToggleOn} className="me-2 text-success" />
+                              Enabled
+                            </>
+                          ) : (
+                            <>
+                              <FontAwesomeIcon icon={faToggleOff} className="me-2 text-secondary" />
+                              Disabled
+                            </>
+                          )}
+                        </span>
+                        
+                        <div>
+                          <Button
+                            variant={autoUpdateEnabled ? "warning" : "success"}
+                            size="sm"
+                            onClick={handleToggleAutoUpdate}
+                            disabled={loading}
+                            className="auto-update-btn"
+                          >
+                            {autoUpdateEnabled ? (
+                              <>
+                                <FontAwesomeIcon icon={faArrowCircleDown} className="me-1" />
+                                Disable
+                              </>
+                            ) : (
+                              <>
+                                <FontAwesomeIcon icon={faArrowCircleUp} className="me-1" />
+                                Enable
+                              </>
+                            )}
+                          </Button>
+                          
+                          {!autoUpdateEnabled && (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={handleForceUpgrade}
+                              disabled={loading}
+                              className="ms-2 upgrade-btn"
+                            >
+                              <FontAwesomeIcon icon={faArrowCircleUp} className="me-1" />
+                              Upgrade
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              </Row>
 
-                    {!nodeOperatorInfo?.isApproved && (
-                      <Form.Text className="text-danger">
-                        Your operator vault must be approved by an admin before you can verify estate owners.
-                      </Form.Text>
-                    )}
-                  </Form>
-                </Card.Body>
-              </Card>
-            </Tab>
-          </Tabs>
+              <Tabs
+                activeKey={activeTab}
+                onSelect={(k) => setActiveTab(k)}
+                className="mb-4 custom-tabs"
+              >
+                <Tab 
+                  eventKey="verifyEstateOwners" 
+                  title={
+                    <span>
+                      <FontAwesomeIcon icon={faUsers} className="me-2" />
+                      Estate Owners
+                    </span>
+                  }
+                >
+                  <Card className="shadow-sm border-0">
+                    <Card.Body className="p-4">
+                      <div className="d-flex justify-content-between align-items-center mb-4">
+                        <h4 className="mb-0">
+                          <FontAwesomeIcon icon={faUsers} className="me-2" />
+                          Estate Owners
+                        </h4>
+                        <Badge bg="primary" pill className="owner-count">
+                          {estateOwners.length} {estateOwners.length === 1 ? 'Owner' : 'Owners'}
+                        </Badge>
+                      </div>
+                      
+                      <div className="table-responsive owners-table">
+                        <Table responsive striped hover className="custom-table">
+                          <thead className="table-header">
+                            <tr>
+                              <th>Name</th>
+                              <th>ETH Address</th>
+                              <th>Country</th>
+                              <th>Estate Value</th>
+                              <th>Tokenization %</th>
+                              <th>Status</th>
+                              <th className="text-center">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {estateOwners.map((owner, index) => (
+                              <tr key={index} className="owner-row">
+                                <td>{owner.name}</td>
+                                <td className="font-monospace small">{owner.ethAddress}</td>
+                                <td>{owner.country}</td>
+                                <td>
+                                  <div className="d-flex align-items-center">
+                                    <span>{formatTokenAmount(owner.currentEstateCost)} {tokenSymbol}</span>
+                                  </div>
+                                </td>
+                                <td>
+                                  <div className="tokenization-percent">
+                                    <div className="progress" style={{ height: '6px' }}>
+                                      <div 
+                                        className="progress-bar bg-primary" 
+                                        role="progressbar" 
+                                        style={{ width: `${owner.percentageToTokenize}%` }}
+                                        aria-valuenow={owner.percentageToTokenize}
+                                        aria-valuemin="0" 
+                                        aria-valuemax="100">
+                                      </div>
+                                    </div>
+                                    <small>{owner.percentageToTokenize}%</small>
+                                  </div>
+                                </td>
+                                <td>
+                                  {owner.isVerified ? (
+                                    <Badge bg="success" className="status-badge">
+                                      <FontAwesomeIcon icon={faCheckCircle} className="me-1" />
+                                      Verified
+                                    </Badge>
+                                  ) : owner.isRejected ? (
+                                    <Badge bg="danger" className="status-badge">
+                                      <FontAwesomeIcon icon={faTimesCircle} className="me-1" />
+                                      Rejected
+                                    </Badge>
+                                  ) : (
+                                    <Badge bg="warning" text="dark" className="status-badge">
+                                      <FontAwesomeIcon icon={faExclamationTriangle} className="me-1" />
+                                      Pending
+                                    </Badge>
+                                  )}
+                                </td>
+                                <td className="text-center">
+                                  <Button
+                                    variant="outline-primary"
+                                    size="sm"
+                                    className="action-btn me-2"
+                                    onClick={() => handleViewDetails(owner)}
+                                  >
+                                    <FontAwesomeIcon icon={faEye} className="me-1" />
+                                    Details
+                                  </Button>
+
+                                  {!owner.isVerified && (
+                                    <Button
+                                      variant="outline-success"
+                                      size="sm"
+                                      className="action-btn"
+                                      onClick={() => handleVerifyFromList(owner)}
+                                    >
+                                      <FontAwesomeIcon icon={faCheck} className="me-1" />
+                                      Verify
+                                    </Button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                            {estateOwners.length === 0 && (
+                              <tr>
+                                <td colSpan="7" className="text-center py-5 text-muted">
+                                  <FontAwesomeIcon icon={faInfoCircle} size="2x" className="mb-3 d-block mx-auto" />
+                                  No estate owners found
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </Table>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Tab>
+
+                <Tab 
+                  eventKey="verifyEstateOwner" 
+                  title={
+                    <span>
+                      <FontAwesomeIcon icon={faCheck} className="me-2" />
+                      Verify Estate Owner
+                    </span>
+                  }
+                >
+                  <Card className="shadow-sm border-0 verification-card">
+                    <Card.Body className="p-4">
+                      <div className="verification-header mb-4">
+                        <h4>
+                          <FontAwesomeIcon icon={faCheck} className="me-2" />
+                          Verify Estate Owner
+                        </h4>
+                        <p className="text-muted">Complete the verification process for the selected estate owner</p>
+                      </div>
+                      
+                      <Form
+                        onSubmit={(e) => {
+                          handleVerifyEstateOwner(e);
+                        }}
+                      >
+                        <Row>
+                          <Col md={6}>
+                            <Form.Group className="mb-3">
+                              <Form.Label>Estate Owner Address</Form.Label>
+                              <div className="input-with-icon">
+                                <FontAwesomeIcon icon={faHome} className="input-icon" />
+                                <Form.Control
+                                  type="text"
+                                  name="estateOwnerAddress"
+                                  value={verifyEstateOwnerForm.estateOwnerAddress}
+                                  onChange={(e) => handleInputChange(e, setVerifyEstateOwnerForm)}
+                                  placeholder="0x..."
+                                  required
+                                  className="ps-4"
+                                  readOnly={!!verifyEstateOwnerForm.estateOwnerId}
+                                />
+                              </div>
+                            </Form.Group>
+                          </Col>
+                          
+                          <Col md={6}>
+                            <Form.Group className="mb-3">
+                              <Form.Label>Tokenization Percentage</Form.Label>
+                              <div className="input-with-icon">
+                                <FontAwesomeIcon icon={faChartLine} className="input-icon" />
+                                <Form.Control
+                                  type="number"
+                                  name="tokenizationPercentage"
+                                  value={verifyEstateOwnerForm.tokenizationPercentage}
+                                  onChange={(e) => handleInputChange(e, setVerifyEstateOwnerForm)}
+                                  min="1"
+                                  max="100"
+                                  required
+                                  className="ps-4"
+                                />
+                              </div>
+                            </Form.Group>
+                          </Col>
+                        </Row>
+                        
+                        <Row>
+                          <Col md={6}>
+                            <Form.Group className="mb-3">
+                              <Form.Label>Estate Value</Form.Label>
+                              <div className="input-with-icon">
+                                <FontAwesomeIcon icon={faCoins} className="input-icon" />
+                                <Form.Control
+                                  type="text"
+                                  name="realEstateValue"
+                                  value={verifyEstateOwnerForm.realEstateValue}
+                                  onChange={(e) => {
+                                    if (/^\d*\.?\d*$/.test(e.target.value)) {
+                                      handleInputChange(e, setVerifyEstateOwnerForm);
+                                    }
+                                  }}
+                                  placeholder="Enter estate value"
+                                  required
+                                  className="ps-4"
+                                />
+                              </div>
+                              <Form.Text className="text-muted">
+                                Value in {tokenSymbol}
+                              </Form.Text>
+                            </Form.Group>
+                          </Col>
+                          
+                          <Col md={6}>
+                            <Form.Group className="mb-3">
+                              <Form.Label>Token</Form.Label>
+                              <div className="input-with-icon">
+                                <FontAwesomeIcon icon={faCoins} className="input-icon" />
+                                <Form.Control
+                                  type="text"
+                                  name="token"
+                                  value={verifyEstateOwnerForm.token}
+                                  onChange={(e) => handleInputChange(e, setVerifyEstateOwnerForm)}
+                                  placeholder="0x..."
+                                  required
+                                  className="ps-4"
+                                />
+                              </div>
+                            </Form.Group>
+                          </Col>
+                        </Row>
+
+                        <div className="text-center mt-4">
+                          <Button 
+                            variant="primary" 
+                            type="submit" 
+                            disabled={loading || !nodeOperatorInfo?.isApproved}
+                            className="px-5 py-2 verify-btn"
+                          >
+                            {loading ? (
+                              <>
+                                <Spinner size="sm" animation="border" className="me-2" />
+                                Processing...
+                              </>
+                            ) : (
+                              <>
+                                <FontAwesomeIcon icon={faCheck} className="me-2" />
+                                Verify Estate Owner
+                              </>
+                            )}
+                          </Button>
+
+                          {!nodeOperatorInfo?.isApproved && (
+                            <div className="text-danger mt-3">
+                              <FontAwesomeIcon icon={faExclamationTriangle} className="me-2" />
+                              Your operator vault must be approved by an admin before you can verify estate owners.
+                            </div>
+                          )}
+                        </div>
+                      </Form>
+                    </Card.Body>
+                  </Card>
+                </Tab>
+              </Tabs>
+            </>
+          )}
+          
+          {/* Estate Owner Details Modal */}
+          <Modal 
+            show={showDetailsModal} 
+            onHide={() => setShowDetailsModal(false)} 
+            size="xl" 
+            centered 
+            dialogClassName="estate-details-modal"
+          >
+            <Modal.Header closeButton className="estate-details-header">
+              <Modal.Title className="estate-details-title">
+                <FontAwesomeIcon icon={faHome} className="me-2 estate-icon pulse-animation" />
+                Estate Owner Profile
+              </Modal.Title>
+            </Modal.Header>
+            
+            <Modal.Body className="p-0">
+              {selectedEstateOwner && (
+                <div className="estate-details-container">
+                  {/* Owner Banner */}
+                  <div className="estate-owner-banner">
+                    <div className="banner-overlay"></div>
+                    <div className="owner-profile-section">
+                      <div className="owner-avatar">
+                        {selectedEstateOwner.name?.charAt(0) || "E"}
+                      </div>
+                      <div className="owner-main-info">
+                        <h3 className="owner-name">{selectedEstateOwner.name}</h3>
+                        <div className="d-flex align-items-center mb-2">
+                          <div className="eth-address-pill">
+                            <FontAwesomeIcon icon={faClipboard} className="me-2" />
+                            <span className="address-text">{selectedEstateOwner.ethAddress}</span>
+                          </div>
+                        </div>
+                        <div className="verification-status">
+                          {selectedEstateOwner.isVerified ? (
+                            <Badge bg="success" pill className="verification-badge">
+                              <FontAwesomeIcon icon={faCheckCircle} className="me-1" />
+                              Verified
+                            </Badge>
+                          ) : selectedEstateOwner.isRejected ? (
+                            <Badge bg="danger" pill className="verification-badge">
+                              <FontAwesomeIcon icon={faTimesCircle} className="me-1" />
+                              Rejected
+                            </Badge>
+                          ) : (
+                            <Badge bg="warning" text="dark" pill className="verification-badge">
+                              <FontAwesomeIcon icon={faExclamationTriangle} className="me-1" />
+                              Pending Verification
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Main Content */}
+                  <div className="details-content-wrapper">
+                    {/* Estate Value Card */}
+                    <div className="estate-value-card">
+                      <div className="estate-value-content">
+                        <div className="estate-value-amount">
+                          <span className="currency-symbol">{tokenSymbol}</span>
+                          <span className="value-amount">{formatTokenAmount(selectedEstateOwner.currentEstateCost)}</span>
+                        </div>
+                        <div className="estate-value-label">Estate Value</div>
+                        <div className="tokenization-wrapper">
+                          <div className="tokenization-label">
+                            <span>Tokenization</span>
+                            <span className="tokenization-percentage">{selectedEstateOwner.percentageToTokenize}%</span>
+                          </div>
+                          <ProgressBar 
+                            now={selectedEstateOwner.percentageToTokenize} 
+                            variant="primary" 
+                            className="tokenization-progress" 
+                          />
+                        </div>
+                      </div>
+                    </div>
+                              
+                    {/* Information Cards */}
+                    <div className="details-cards-container">
+                      {/* Personal Information Card */}
+                      <div className="detail-card">
+                        <div className="detail-card-header">
+                          <FontAwesomeIcon icon={faUserShield} className="detail-card-icon" />
+                          <h4>Personal Information</h4>
+                        </div>
+                        <div className="detail-card-body">
+                          <div className="info-row">
+                            <div className="info-label">Country</div>
+                            <div className="info-value">{selectedEstateOwner.country || 'Not specified'}</div>
+                          </div>
+                          <div className="info-row">
+                            <div className="info-label">State/Region</div>
+                            <div className="info-value">{selectedEstateOwner.state || 'Not specified'}</div>
+                          </div>
+                          <div className="info-row">
+                            <div className="info-label">Address</div>
+                            <div className="info-value">{selectedEstateOwner.address || 'Not specified'}</div>
+                          </div>
+                          <div className="info-row">
+                            <div className="info-label">KYC Type</div>
+                            <div className="info-value">
+                              <Badge bg="light" text="dark" className="kyc-badge">{selectedEstateOwner.kycType || 'Not specified'}</Badge>
+                            </div>
+                          </div>
+                          <div className="info-row">
+                            <div className="info-label">KYC ID</div>
+                            <div className="info-value">{selectedEstateOwner.kycId || 'Not specified'}</div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Estate Information Card */}
+                      <div className="detail-card">
+                        <div className="detail-card-header">
+                          <FontAwesomeIcon icon={faHome} className="detail-card-icon" />
+                          <h4>Estate Information</h4>
+                        </div>
+                        <div className="detail-card-body">
+                          <div className="info-row">
+                            <div className="info-label">Estate Details</div>
+                            <div className="info-value estate-description">{selectedEstateOwner.realEstateInfo || 'No information provided'}</div>
+                          </div>
+                          <div className="info-row">
+                            <div className="info-label">Registration Date</div>
+                            <div className="info-value">
+                              {selectedEstateOwner.createdAt ? new Date(selectedEstateOwner.createdAt).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              }) : 'Not available'}
+                            </div>
+                          </div>
+                          <div className="info-row">
+                            <div className="info-label">Status</div>
+                            <div className="info-value">
+                              {selectedEstateOwner.isVerified ? (
+                                <span className="status-text success">
+                                  <FontAwesomeIcon icon={faCheckCircle} className="me-2" />
+                                  Verified
+                                </span>
+                              ) : selectedEstateOwner.isRejected ? (
+                                <span className="status-text danger">
+                                  <FontAwesomeIcon icon={faTimesCircle} className="me-2" />
+                                  Rejected
+                                </span>
+                              ) : (
+                                <span className="status-text warning">
+                                  <FontAwesomeIcon icon={faExclamationTriangle} className="me-2" />
+                                  Pending Verification
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Documents Section */}
+                    <div className="documents-section">
+                      <h4 className="documents-title">
+                        <FontAwesomeIcon icon={faClipboard} className="me-2" />
+                        Verification Documents
+                      </h4>
+                      
+                      <div className="documents-container">
+                        {/* KYC Document */}
+                        <div className="document-card">
+                          <div className="document-header">
+                            <FontAwesomeIcon icon={faUserShield} className="document-icon" />
+                            <h5>KYC Document</h5>
+                          </div>
+                          <div className="document-body">
+                            {selectedEstateOwner.kycDocumentImage ? (
+                              <div className="document-image-container">
+                                <img
+                                  src={selectedEstateOwner.kycDocumentImage}
+                                  alt="KYC Document"
+                                  className="document-image"
+                                  
+                                />
+                                <div onClick={() => { window.open(selectedEstateOwner.kycDocumentImage, '_blank');}} className="image-overlay">
+                                  <FontAwesomeIcon icon={faEye} />
+                                  <span>Click to View</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="missing-document">
+                                <FontAwesomeIcon icon={faExclamationTriangle} />
+                                <p>No KYC document provided</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Ownership Document */}
+                        <div className="document-card">
+                          <div className="document-header">
+                            <FontAwesomeIcon icon={faHome} className="document-icon" />
+                            <h5>Ownership Document</h5>
+                          </div>
+                          <div className="document-body">
+                            {selectedEstateOwner.ownershipDocumentImage ? (
+                              <div className="document-image-container">
+                                <img
+                                  src={selectedEstateOwner.ownershipDocumentImage}
+                                  alt="Ownership Document"
+                                  className="document-image"
+                                />
+                                <div onClick={() => window.open(selectedEstateOwner.ownershipDocumentImage, '_blank')} className="image-overlay">
+                                  <FontAwesomeIcon icon={faEye} />
+                                  <span>Click to view</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="missing-document">
+                                <FontAwesomeIcon icon={faExclamationTriangle} />
+                                <p>No ownership document provided</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </Modal.Body>
+            
+            <Modal.Footer className="estate-details-footer">
+              <Button variant="outline-secondary" className="btn-close-details" onClick={() => setShowDetailsModal(false)}>
+                Close
+              </Button>
+
+              {selectedEstateOwner && !selectedEstateOwner.isVerified && (
+                <Button
+                  variant="primary"
+                  className="btn-verify-estate"
+                  onClick={() => {
+                    handleVerifyFromList(selectedEstateOwner);
+                    setShowDetailsModal(false);
+                  }}
+                >
+                  <FontAwesomeIcon icon={faCheck} className="me-2" />
+                  Verify Estate Owner
+                </Button>
+              )}
+            </Modal.Footer>
+          </Modal>
         </>
       )}
-
-      {/* Estate Owner Details Modal */}
-      <Modal show={showDetailsModal} onHide={() => setShowDetailsModal(false)} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>Estate Owner Details</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {selectedEstateOwner && (
-            <div>
-              <h5>{selectedEstateOwner.name}</h5>
-              <Table responsive bordered>
-                <tbody>
-                  <tr>
-                    <th>ETH Address</th>
-                    <td>{selectedEstateOwner.ethAddress}</td>
-                  </tr>
-                  <tr>
-                    <th>Country</th>
-                    <td>{selectedEstateOwner.country}</td>
-                  </tr>
-                  <tr>
-                    <th>State</th>
-                    <td>{selectedEstateOwner.state}</td>
-                  </tr>
-                  <tr>
-                    <th>Address</th>
-                    <td>{selectedEstateOwner.address}</td>
-                  </tr>
-                  <tr>
-                    <th>KYC Type</th>
-                    <td>{selectedEstateOwner.kycType}</td>
-                  </tr>
-                  <tr>
-                    <th>KYC ID</th>
-                    <td>{selectedEstateOwner.kycId}</td>
-                  </tr>
-                  <tr>
-                    <th>Real Estate Information</th>
-                    <td>{selectedEstateOwner.realEstateInfo}</td>
-                  </tr>
-                  <tr>
-                    <th>Estate Value</th>
-                    <td>{formatTokenAmount(selectedEstateOwner.currentEstateCost)} {tokenSymbol}</td>
-                  </tr>
-                  <tr>
-                    <th>Tokenization Percentage</th>
-                    <td>{selectedEstateOwner.percentageToTokenize}%</td>
-                  </tr>
-                  <tr>
-                    <th>Status</th>
-                    <td>{selectedEstateOwner.isVerified ? 'Verified' : 'Pending'}</td>
-                  </tr>
-                </tbody>
-              </Table>
-
-              <div className="mt-3">
-                <h6>KYC Document</h6>
-                {selectedEstateOwner.kycDocumentImage ? (
-                  <img
-                    src={selectedEstateOwner.kycDocumentImage}
-                    alt="KYC Document"
-                    className="img-fluid mb-3"
-                    style={{ maxHeight: '200px' }}
-                  />
-                ) : (
-                  <p>No KYC document image available</p>
-                )}
-
-                <h6>Ownership Document</h6>
-                {selectedEstateOwner.ownershipDocumentImage ? (
-                  <img
-                    src={selectedEstateOwner.ownershipDocumentImage}
-                    alt="Ownership Document"
-                    className="img-fluid"
-                    style={{ maxHeight: '200px' }}
-                  />
-                ) : (
-                  <p>No ownership document image available</p>
-                )}
-              </div>
-            </div>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDetailsModal(false)}>
-            Close
-          </Button>
-
-          {selectedEstateOwner && !selectedEstateOwner.isVerified && (
-            <Button
-              variant="success"
-              onClick={() => {
-                handleVerifyFromList(selectedEstateOwner);
-                setShowDetailsModal(false);
-              }}
-            >
-              Verify
-            </Button>
-          )}
-        </Modal.Footer>
-      </Modal>
     </div>
   );
 };
