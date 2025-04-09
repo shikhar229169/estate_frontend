@@ -326,7 +326,7 @@ body {
 .supported-chains {
   margin-top: 3rem;
   padding-top: 2rem;
-  border-top: 1px solid rgba(0,0,0,0.1);
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .supported-chains h3 {
@@ -765,17 +765,17 @@ body {
   .input-with-icon {
     flex-direction: column;
   }
-  
+
   .input-with-icon .icon {
     margin-bottom: 10px;
     margin-right: 0;
     margin-top: 0;
   }
-  
+
   .auto-update-toggle {
     margin-left: 0;
   }
-  
+
   .form-section {
     padding: 1.5rem;
   }
@@ -786,15 +786,15 @@ body {
   .home-container h1 {
     font-size: 2.5rem;
   }
-  
+
   .welcome-banner {
     padding: 2rem 1rem;
   }
-  
+
   .welcome-banner h2 {
     font-size: 2rem;
   }
-  
+
   .welcome-banner p {
     font-size: 1rem;
     max-width: 100%;
@@ -805,12 +805,580 @@ body {
   .home-container h1 {
     font-size: 2rem;
   }
-  
+
   .home-container .card {
     margin-bottom: 1.5rem;
   }
-  
+
   .welcome-banner h2 {
     font-size: 1.8rem;
+  }
+}
+
+/* Estate Owner Signup Stunning Styles - Enhanced Version */
+.estate-owner-signup-container {
+  background-image: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+  padding: 3rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.estate-owner-signup-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: radial-gradient(
+      circle at 20% 30%,
+      rgba(41, 128, 185, 0.15) 0%,
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 80% 70%,
+      rgba(52, 152, 219, 0.1) 0%,
+      transparent 40%
+    );
+  z-index: 0;
+}
+
+/* Animated background elements */
+.estate-owner-signup-container::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  background-image: url("data:image/svg+xml,%3Csvg width='52' height='26' viewBox='0 0 52 26' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2334495e' fill-opacity='0.05'%3E%3Cpath d='M10 10c0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6h2c0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4v2c-3.314 0-6-2.686-6-6 0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6zm25.464-1.95l8.486 8.486-1.414 1.414-8.486-8.486 1.414-1.414z' /%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* Main card styling */
+.estate-owner-signup-card {
+  border: none;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px); /* For Safari 9+ and iOS Safari 9+ */
+  transform: translateY(0);
+  transition: all 0.5s cubic-bezier(0.215, 0.61, 0.355, 1);
+  position: relative;
+  z-index: 1;
+  animation: fadeInUp 0.8s ease-out forwards;
+  max-width: 90%;
+  margin: 0 auto;
+}
+
+.estate-owner-signup-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+}
+
+/* Card header styling */
+.estate-owner-signup-header {
+  background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+  color: white;
+  padding: 2.5rem 2rem;
+  position: relative;
+  text-align: center;
+  overflow: hidden;
+  border-bottom-left-radius: 30px;
+  border-bottom-right-radius: 30px;
+}
+
+.estate-owner-signup-header::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ffffff' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
+  opacity: 0.3;
+}
+
+.estate-owner-signup-header h2 {
+  font-size: 2.8rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+  position: relative;
+  text-shadow: 0 2px 15px rgba(0, 0, 0, 0.2);
+  animation: fadeIn 1s ease-out;
+}
+
+.estate-owner-signup-header p {
+  font-size: 1.2rem;
+  opacity: 0.9;
+  position: relative;
+  max-width: 600px;
+  margin: 0 auto;
+  animation: fadeIn 1s ease-out 0.3s forwards;
+  opacity: 0;
+}
+
+/* Form body styling */
+.estate-owner-signup-body {
+  padding: 2.5rem 3rem;
+  background-color: #ffffff;
+  border-radius: 20px;
+  margin-top: -20px;
+  position: relative;
+  z-index: 2;
+}
+
+/* Form sections */
+.estate-signup-section-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 2rem 0 1.5rem;
+  position: relative;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid #f1f3f5;
+  border-radius: 0;
+}
+
+/* Feature boxes */
+.estate-signup-features {
+  display: flex;
+  justify-content: space-between;
+  margin: 2rem 0;
+}
+
+.estate-signup-feature-box {
+  flex: 1;
+  padding: 1.5rem;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 16px;
+  text-align: center;
+  margin: 0 0.75rem;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+  animation: fadeInRight 0.6s ease-out forwards;
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+.estate-signup-feature-box:nth-child(1) {
+  animation-delay: 0.2s;
+}
+
+.estate-signup-feature-box:nth-child(2) {
+  animation-delay: 0.4s;
+}
+
+.estate-signup-feature-box:nth-child(3) {
+  animation-delay: 0.6s;
+}
+
+@keyframes fadeInRight {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.estate-signup-feature-box::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(52, 152, 219, 0.05) 0%,
+    rgba(44, 62, 80, 0.05) 100%
+  );
+  z-index: -1;
+}
+
+.estate-signup-feature-box:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+}
+
+.estate-signup-feature-box .icon {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  color: #3498db;
+  background: linear-gradient(135deg, #3498db, #2c3e50);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.estate-signup-feature-box h3 {
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  color: #2c3e50;
+  font-size: 1.2rem;
+}
+
+.estate-signup-feature-box p {
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  margin-bottom: 0;
+}
+
+/* Form group styling */
+.estate-signup-form-group {
+  margin-bottom: 2rem;
+  position: relative;
+  padding: 0.5rem;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.estate-signup-form-group:hover {
+  background-color: rgba(52, 152, 219, 0.03);
+}
+
+.estate-signup-form-label {
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 0.75rem;
+  display: block;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  padding-left: 0.5rem;
+}
+
+.estate-signup-required {
+  color: #e74c3c;
+  margin-left: 4px;
+  font-weight: 700;
+}
+
+.estate-signup-form-control {
+  display: block;
+  width: 100%;
+  padding: 0.9rem 1.2rem;
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: #495057;
+  background-color: #fff;
+  background-clip: padding-box;
+  border: 2px solid #e9ecef;
+  border-radius: 15px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.estate-signup-form-control:focus {
+  border-color: #3498db;
+  box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.08);
+  outline: none;
+}
+
+.estate-signup-form-control:disabled {
+  background-color: #f8f9fa;
+  cursor: not-allowed;
+  font-weight: 600;
+  color: #6c757d;
+  border-color: #dee2e6;
+}
+
+.estate-signup-form-text {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #6c757d;
+}
+
+/* File input styling */
+.estate-signup-file-input {
+  position: relative;
+  display: block;
+}
+
+.estate-signup-file-input label {
+  display: block;
+  padding: 1.2rem;
+  text-align: center;
+  background-color: #f8f9fa;
+  border-radius: 15px;
+  border: 2px dashed #ced4da;
+  color: #6c757d;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.estate-signup-file-input label:hover {
+  background-color: #e9ecef;
+  border-color: #adb5bd;
+  color: #495057;
+}
+
+.estate-signup-file-input input[type='file'] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.estate-signup-file-input .file-selected {
+  background-color: rgba(52, 152, 219, 0.1) !important;
+  border-color: #3498db !important;
+  color: #3498db !important;
+}
+
+/* Submit button styling */
+.estate-signup-submit-btn {
+  display: block;
+  width: 100%;
+  padding: 1.1rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-align: center;
+  color: #fff;
+  background: linear-gradient(45deg, #2c3e50, #3498db);
+  border: none;
+  border-radius: 20px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  box-shadow: 0 10px 20px rgba(44, 62, 80, 0.15);
+  position: relative;
+  overflow: hidden;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.estate-signup-submit-btn:hover:not(:disabled) {
+  box-shadow: 0 15px 30px rgba(44, 62, 80, 0.2);
+  transform: translateY(-3px);
+}
+
+.estate-signup-submit-btn:disabled {
+  background: linear-gradient(45deg, #95a5a6, #7f8c8d);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.estate-signup-submit-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  transition: all 0.6s ease;
+}
+
+.estate-signup-submit-btn:hover:not(:disabled)::before {
+  left: 100%;
+}
+
+/* Alert styling */
+.estate-signup-alert {
+  border-radius: 15px;
+  padding: 1.2rem 1.5rem;
+  margin-bottom: 2rem;
+  position: relative;
+  animation: slideDown 0.5s ease-out forwards;
+  transform: translateY(-20px);
+  opacity: 0;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+}
+
+@keyframes slideDown {
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.estate-signup-alert-danger {
+  background-color: rgba(231, 76, 60, 0.1);
+  color: #c0392b;
+  border-left: 4px solid #e74c3c;
+}
+
+.estate-signup-alert-success {
+  background-color: rgba(46, 204, 113, 0.1);
+  color: #27ae60;
+  border-left: 4px solid #2ecc71;
+}
+
+/* Already registered card */
+.estate-signup-registered {
+  text-align: center;
+  padding: 3.5rem 2rem;
+}
+
+.estate-signup-registered h3 {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #2c3e50;
+  margin-bottom: 1.5rem;
+}
+
+.estate-signup-registered p {
+  font-size: 1.1rem;
+  color: #7f8c8d;
+  max-width: 500px;
+  margin: 0 auto 2rem;
+}
+
+.estate-signup-dashboard-btn {
+  display: inline-block;
+  padding: 1rem 2.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(45deg, #2c3e50, #3498db);
+  border: none;
+  border-radius: 50px;
+  box-shadow: 0 10px 20px rgba(44, 62, 80, 0.2);
+  transition: all 0.3s ease;
+  text-decoration: none;
+}
+
+.estate-signup-dashboard-btn:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 30px rgba(44, 62, 80, 0.3);
+  color: white;
+}
+
+/* Loading spinner */
+.estate-signup-spinner-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 80vh;
+}
+
+.estate-signup-spinner {
+  width: 60px;
+  height: 60px;
+  border: 5px solid rgba(52, 152, 219, 0.1);
+  border-radius: 50%;
+  border-top-color: #3498db;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Form row */
+.estate-signup-form-row {
+  margin-bottom: 1rem;
+}
+
+/* Select styling */
+.estate-signup-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%232c3e50' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-size: 16px 12px;
+  padding-right: 2.5rem;
+}
+
+/* Textarea styling */
+.estate-signup-textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+/* Magic sparkle effect for submit button */
+.estate-signup-submit-btn:hover::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: radial-gradient(
+      circle,
+      rgba(255, 255, 255, 0.3) 10%,
+      transparent 10.5%
+    ),
+    radial-gradient(circle, rgba(255, 255, 255, 0.3) 10%, transparent 10.5%);
+  background-position: 0% 0%, 50% 50%;
+  background-size: 5em 5em;
+  opacity: 0.4;
+  animation: sparkle 10s linear infinite;
+}
+
+@keyframes sparkle {
+  0% {
+    background-position: 0% 0%, 50% 50%;
+    opacity: 0.4;
+  }
+  25% {
+    background-position: 25% 25%, 75% 75%;
+    opacity: 0.6;
+  }
+  50% {
+    background-position: 50% 50%, 0% 0%;
+    opacity: 0.4;
+  }
+  75% {
+    background-position: 75% 75%, 25% 25%;
+    opacity: 0.6;
+  }
+  100% {
+    background-position: 0% 0%, 50% 50%;
+    opacity: 0.4;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 991px) {
+  .estate-owner-signup-header h2 {
+    font-size: 2.2rem;
+  }
+
+  .estate-signup-features {
+    flex-direction: column;
+  }
+
+  .estate-signup-feature-box {
+    margin: 0.5rem 0;
+  }
+
+  .estate-owner-signup-body {
+    padding: 2rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .estate-owner-signup-header h2 {
+    font-size: 1.8rem;
+  }
+
+  .estate-owner-signup-header p {
+    font-size: 1rem;
+  }
+
+  .estate-owner-signup-body {
+    padding: 1.5rem;
+    margin-top: -15px;
   }
 }
