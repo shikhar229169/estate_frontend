@@ -10,7 +10,7 @@ export const connectWallet = async () => {
       const accounts = await window.ethereum.request({
         method: 'eth_requestAccounts',
       });
-      
+
       if (accounts.length > 0) {
         return {
           address: accounts[0],
@@ -43,7 +43,7 @@ export const getCurrentWalletConnected = async () => {
       const accounts = await window.ethereum.request({
         method: 'eth_accounts',
       });
-      
+
       if (accounts.length > 0) {
         return {
           address: accounts[0],
@@ -79,7 +79,7 @@ export const getChainId = async () => {
       const chainId = await window.ethereum.request({
         method: 'eth_chainId',
       });
-      
+
       return parseInt(chainId, 16);
     } catch (err) {
       console.error('Error getting chain ID:', err);
@@ -96,7 +96,7 @@ export const switchNetwork = async (chainId) => {
     alert('Please install MetaMask to use this application');
     return;
   }
-  
+
   try {
     // Try to switch to the network
     await window.ethereum.request({
@@ -108,7 +108,7 @@ export const switchNetwork = async (chainId) => {
     if (switchError.code === 4902) {
       try {
         let params;
-        
+
         if (chainId === 43113) {
           // Avalanche Fuji Testnet
           params = {
@@ -136,7 +136,7 @@ export const switchNetwork = async (chainId) => {
             blockExplorerUrls: ['https://sepolia.etherscan.io/'],
           };
         }
-        
+
         await window.ethereum.request({
           method: 'wallet_addEthereumChain',
           params: [params],
@@ -173,40 +173,40 @@ export const getContracts = (chainId) => {
   if (!window.ethereum) {
     return { error: 'Please install MetaMask to use this application' };
   }
-  
+
   // Default to Sepolia testnet if chain ID is not supported
   if (chainId !== 11155111 && chainId !== 43113) {
     return { error: 'Unsupported network. Please switch to Avalanche Fuji or Ethereum Sepolia' };
   }
-  
+
   try {
     const provider = new ethers.providers.Web3Provider(window.ethereum);
     const signer = provider.getSigner();
-    
+
     // Get contract configuration based on the current chain ID
     const contractConfig = getContractConfig(chainId);
-    
+
     console.log(`Using contracts for chain ID: ${chainId}`);
-    
+
     // Create contract instances
     const realEstateRegistry = new ethers.Contract(
       contractConfig.RealEstateRegistry.address,
       contractConfig.RealEstateRegistry.abi,
       signer
     );
-    
+
     const assetTokenizationManager = new ethers.Contract(
       contractConfig.AssetTokenizationManager.address,
       contractConfig.AssetTokenizationManager.abi,
       signer
     );
-    
+
     const estateVerification = new ethers.Contract(
       contractConfig.EstateVerification.address,
       contractConfig.EstateVerification.abi,
       signer
     );
-    
+
     return {
       provider,
       signer,
@@ -242,7 +242,7 @@ export const approveTokens = async (tokenAddress, spenderAddress, amount, signer
   }
 };
 
-export const getDecimalsFromTokenContract = async(tokenAddress, signer) => {
+export const getDecimalsFromTokenContract = async (tokenAddress, signer) => {
   try {
     const tokenContract = getERC20Contract(tokenAddress, signer);
     const decimals = await tokenContract.decimals();
@@ -276,91 +276,143 @@ export const getTokenAllowance = async (tokenAddress, ownerAddress, spenderAddre
 };
 
 // Get all tokenized real estates
-export const getAllTokenizedRealEstates = async (signer) => {
+export const getAllTokenizedRealEstates = async (signer, walletAddress, realEstateRegistryAddr) => {
   try {
     console.log('Getting all tokenized estates...');
-    
+
     // Get the current chain ID
     const provider = signer.provider;
     const { chainId } = await provider.getNetwork();
-    
+
     console.log(`Current chain ID: ${chainId}`);
-    
+
     // Get contract config for the current chain
     const contractConfig = getContractConfig(chainId);
-    
+
     console.log(`Asset Tokenization Manager address: ${contractConfig.AssetTokenizationManager.address}`);
-    
+
     const assetTokenizationManager = new ethers.Contract(
       contractConfig.AssetTokenizationManager.address,
       contractConfig.AssetTokenizationManager.abi,
       signer
     );
-    
+
     const tokenCounter = await assetTokenizationManager.getTokenCounter();
     console.log(`Token counter: ${tokenCounter.toString()}`);
-    
+
     const tokenizedEstates = [];
-    
+
+    const treAddrPromises = [];
+    for (let tokenId = 0; tokenId < tokenCounter.toNumber(); tokenId++) {
+      const tokenAddressPromise = assetTokenizationManager.getTokenIdToChainIdToTokenizedRealEstate(tokenId, chainId);
+      treAddrPromises.push(tokenAddressPromise);
+    }
+
+    const treAddresses = await Promise.all(treAddrPromises);
+    const treDataPromises = [];
+
+    for (let tokenId = 0; tokenId < tokenCounter.toNumber(); tokenId++) {
+      const tokenAddress = treAddresses[tokenId];
+
+      const tokenContract = new ethers.Contract(
+        tokenAddress,
+        TokenizedRealEstateABI,
+        signer
+      );
+
+      const nameWithAddr = tokenContract.name();
+      const symbolWithAddr = tokenContract.symbol();
+      const totalSupply = tokenContract.totalSupply();
+      const paymentToken = tokenContract.getPaymentToken();
+      const tokenPrice = tokenContract.getPerEstateTokenPrice();
+      const balance = tokenContract.getEstateTokensMintedBy(walletAddress);
+      const allowance = tokenContract.allowance(walletAddress, realEstateRegistryAddr);
+      const userCollateralAmount = tokenContract.getCollateralDepositedBy(walletAddress);
+      const userClaimedRewards = tokenContract.getClaimedRewards();
+      const userClaimableRewards = tokenContract.getClaimableRewards();
+      const allChainsBalance = tokenContract.balanceOf(walletAddress);
+
+      treDataPromises.push({ nameWithAddr, symbolWithAddr, totalSupply, paymentToken, tokenPrice, balance, allowance, userCollateralAmount, userClaimedRewards, userClaimableRewards, allChainsBalance });
+    }
+
+    const treData = await Promise.all(
+      treDataPromises.map(async (obj) => {
+        const resolvedObj = {};
+
+        for (const [key, value] of Object.entries(obj)) {
+          resolvedObj[key] = await value;
+        }
+
+        return resolvedObj;
+      })
+    );
+
+    const paymentTokenSymbolPromises = [];
+    const paymentTokenDecimalsPromises = [];
+
+    for (let tokenId = 0; tokenId < tokenCounter.toNumber(); tokenId++) {
+      const { paymentToken } = treData[tokenId];
+
+      if (paymentToken === ethers.constants.AddressZero) {
+        paymentTokenSymbolPromises.push(chainId === 43113 ? 'AVAX' : 'ETH');
+        paymentTokenDecimalsPromises.push(18);
+      }
+      else {
+        const paymentTokenContract = getERC20Contract(paymentToken, signer);
+        paymentTokenSymbolPromises.push(paymentTokenContract.symbol());
+        paymentTokenDecimalsPromises.push(paymentTokenContract.decimals());
+      }
+    }
+
+    const paymentTokenSymbols = await Promise.all(paymentTokenSymbolPromises);
+    const paymentTokensDecimals = await Promise.all(paymentTokenDecimalsPromises);
+
     // Loop through all token IDs
     for (let tokenId = 0; tokenId < tokenCounter.toNumber(); tokenId++) {
       try {
         // Get the tokenized real estate contract address
-        const tokenAddress = await assetTokenizationManager.getTokenIdToChainIdToTokenizedRealEstate(tokenId, chainId);
-        
-        console.log(`Token ID ${tokenId} address: ${tokenAddress}`);
-        
+        const tokenAddress = treAddresses[tokenId];
+
+        // console.log(`Token ID ${tokenId} address: ${tokenAddress}`);
+
         // Skip if address is zero (not deployed on this chain)
         if (tokenAddress === ethers.constants.AddressZero) {
-          console.log(`Token ID ${tokenId} not deployed on chain ${chainId}`);
+          // console.log(`Token ID ${tokenId} not deployed on chain ${chainId}`);
           continue;
         }
-        
-        // Get the tokenized real estate contract
-        const tokenContract = new ethers.Contract(
-          tokenAddress,
-          TokenizedRealEstateABI,
-          signer
-        );
-        
-        // Get token details
-        const nameWithAddr = await tokenContract.name();
-        const symbolWithAddr = await tokenContract.symbol();
+        const name = treData[tokenId].nameWithAddr.split(' - ')[0];
+        const symbol = treData[tokenId].symbolWithAddr.split('-')[0];
+        const estateOwner = treData[tokenId].nameWithAddr.split(' - ')[1];
 
-        const name = nameWithAddr.split(' - ')[0];
-        const symbol = symbolWithAddr.split('-')[0];
-        const estateOwner = nameWithAddr.split(' - ')[1];
+        // console.log(`Token ID ${tokenId} details: ${name} (${symbol}), Total Supply: ${totalSupply.toString()}`);
 
-        const totalSupply = await tokenContract.totalSupply();
-        const paymentToken = await tokenContract.getPaymentToken();
-        let paymentTokenSymbol;
-        if (paymentToken === ethers.constants.AddressZero) {
-          paymentTokenSymbol = chainId === 43113 ? 'AVAX' : 'ETH';
-        }
-        else {
-          const paymentTokenContract = getERC20Contract(paymentToken, signer);
-          paymentTokenSymbol = await paymentTokenContract.symbol();
-        }
-        
-        console.log(`Token ID ${tokenId} details: ${name} (${symbol}), Total Supply: ${totalSupply.toString()}`);
-        
         tokenizedEstates.push({
           tokenId,
           address: tokenAddress,
           name,
           symbol,
           estateOwner,
-          totalSupply: totalSupply, // Store as BigNumber
+          totalSupply: treData[tokenId].totalSupply, // Store as BigNumber
           maxTreMintable: contractConfig.TokenizedRealEstate.MAX_TRE_MINTABLE,
-          paymentToken: paymentToken,
-          paymentTokenSymbol: paymentTokenSymbol
+          paymentToken: treData[tokenId].paymentToken,
+          paymentTokenSymbol: paymentTokenSymbols[tokenId],
+          tokenPrice: treData[tokenId].tokenPrice,
+          formattedTokenPrice: ethers.utils.formatUnits(treData[tokenId].tokenPrice, paymentTokensDecimals[tokenId]),
+          balance: treData[tokenId].balance,
+          allowance: treData[tokenId].allowance,
+          userCollateral: treData[tokenId].userCollateralAmount,
+          allChainsBalance: chainId === 43113 ? treData[tokenId].allChainsBalance : undefined,
+          formattedCollateral: ethers.utils.formatUnits(treData[tokenId].userCollateralAmount, paymentTokensDecimals[tokenId]),
+          claimedRewards: ethers.utils.formatUnits(treData[tokenId].userClaimedRewards, paymentTokensDecimals[tokenId]),
+          claimableRewards: ethers.utils.formatUnits(treData[tokenId].userClaimableRewards, paymentTokensDecimals[tokenId]),
+          tokensAvailable: contractConfig.TokenizedRealEstate.MAX_TRE_MINTABLE.sub(ethers.BigNumber.from(treData[tokenId].totalSupply))
         });
       } catch (error) {
         console.error(`Error fetching token ID ${tokenId}:`, error);
         // Continue to next token ID even if this one fails
       }
     }
-    
+    console.log(tokenizedEstates);
     return tokenizedEstates;
   } catch (error) {
     console.error('Failed to get tokenized real estates:', error);

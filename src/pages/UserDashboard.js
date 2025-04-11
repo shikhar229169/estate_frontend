@@ -6,8 +6,10 @@ import { getEstateOwnerByAddress, updateCollateral, upsertTokenizedPositionData,
 import TokenizedRealEstateABI from '../contracts/abi/TokenizedRealEstate';
 // Import FontAwesome icons
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faShoppingCart, faTags, faCoins, faMoneyBillTransfer, faDollarSign, faSnowflake, faMoneyCheckDollar, 
-  faInfoCircle, faHistory, faDownload, faHome, faChartLine, faWallet, faBuilding, faLayerGroup, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
+import {
+  faShoppingCart, faTags, faCoins, faMoneyBillTransfer, faDollarSign, faSnowflake, faMoneyCheckDollar,
+  faInfoCircle, faHistory, faDownload, faHome, faChartLine, faWallet, faBuilding, faLayerGroup, faCheckCircle
+} from '@fortawesome/free-solid-svg-icons';
 // Import Excel export library
 import * as XLSX from 'xlsx';
 
@@ -93,62 +95,7 @@ const UserDashboard = ({ walletAddress, chainId }) => {
 
       console.log(`Loading tokenized estates for chain ID: ${contractInstances.chainId}`);
 
-      const estates = await getAllTokenizedRealEstates(contractInstances.signer);
-
-      for (const estate of estates) {
-        try {
-          const tokenContract = new ethers.Contract(
-            estate.address,
-            TokenizedRealEstateABI,
-            contractInstances.signer
-          );
-
-          const balance = await tokenContract.getEstateTokensMintedBy(walletAddress);
-
-          // Allowance
-          const allowance = await tokenContract.allowance(walletAddress, contractInstances.realEstateRegistry.address);
-
-          estate.balance = balance;
-          estate.allowance = allowance;
-          estate.tokenPrice = await tokenContract.getPerEstateTokenPrice();
-
-          const totalSupplyBN = ethers.BigNumber.from(estate.totalSupply);
-          estate.tokensAvailable = estate.maxTreMintable.sub(totalSupplyBN);
-
-          const formattedTokenPrice = await formatTokenAmount(estate.tokenPrice, estate.paymentToken, contractInstances.signer);
-          estate.formattedTokenPrice = formattedTokenPrice;
-
-          // Load user's collateral for this estate
-          try {
-            const userCollateralAmount = await tokenContract.getCollateralDepositedBy(walletAddress);
-            const userClaimedRewards = await tokenContract.getClaimedRewards();
-            const userClaimableRewards = await tokenContract.getClaimableRewards();
-
-            estate.userCollateral = userCollateralAmount;
-
-            // Format user collateral based on payment token decimals
-            const formattedCollateral = await formatTokenAmount(userCollateralAmount, estate.paymentToken, contractInstances.signer);
-            const formattedClaimedRewards = await formatTokenAmount(userClaimedRewards, estate.paymentToken, contractInstances.signer);
-            const formattedClaimableRewards = await formatTokenAmount(userClaimableRewards, estate.paymentToken, contractInstances.signer);
-
-            if (chainId === 43113) {
-              const allChainsBalance = await tokenContract.balanceOf(walletAddress);
-              estate.allChainsBalance = allChainsBalance;
-            }
-
-            estate.formattedCollateral = formattedCollateral;
-            estate.claimedRewards = formattedClaimedRewards;
-            estate.claimableRewards = formattedClaimableRewards;
-          } catch (error) {
-            console.error(`Error fetching collateral for ${estate.address}:`, error);
-            estate.userCollateral = ethers.BigNumber.from(0);
-            estate.formattedCollateral = "0";
-          }
-
-        } catch (error) {
-          console.error(`Error fetching balance for token ${estate.address}:`, error);
-        }
-      }
+      const estates = await getAllTokenizedRealEstates(contractInstances.signer, walletAddress, contractInstances.realEstateRegistry.address);
 
       setTokenizedEstates(estates);
     } catch (error) {
@@ -594,10 +541,10 @@ const UserDashboard = ({ walletAddress, chainId }) => {
   // New function: Helper function to get the correct block explorer URL based on chainId
   const getBlockExplorerUrl = (addressOrHash, isTransaction = false) => {
     const chainId = window.ethereum?.chainId ? parseInt(window.ethereum.chainId, 16) : 1;
-    
+
     let baseUrl = 'https://etherscan.io';
     let pathPrefix = isTransaction ? 'tx' : 'address';
-    
+
     if (chainId === 43113) {
       // Avalanche Fuji Testnet
       baseUrl = 'https://testnet.snowtrace.io';
@@ -608,17 +555,17 @@ const UserDashboard = ({ walletAddress, chainId }) => {
       // Avalanche Mainnet
       baseUrl = 'https://snowtrace.io';
     }
-    
+
     return `${baseUrl}/${pathPrefix}/${addressOrHash}`;
   };
 
   // Format date helper function
   const formatDate = (dateString) => {
-    const options = { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric', 
-      hour: '2-digit', 
+    const options = {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
       minute: '2-digit',
       hour12: true
     };
@@ -627,7 +574,7 @@ const UserDashboard = ({ walletAddress, chainId }) => {
 
   // Helper function to get transaction type badge color
   const getTransactionBadgeColor = (transactionType) => {
-    switch(transactionType.toLowerCase()) {
+    switch (transactionType.toLowerCase()) {
       case 'collateral_deposit':
         return 'success';
       case 'collateral_withdraw':
@@ -655,7 +602,7 @@ const UserDashboard = ({ walletAddress, chainId }) => {
     try {
       setLoadingTransactionHistory(true);
       setError('');
-      
+
       const response = await getUserTreLog(estate.address, walletAddress);
       setTransactionHistory(response);
     } catch (error) {
@@ -730,7 +677,7 @@ const UserDashboard = ({ walletAddress, chainId }) => {
               </div>
               <div className="stat-content">
                 <div className="stat-value">
-                  {tokenizedEstates.filter(estate => 
+                  {tokenizedEstates.filter(estate =>
                     estate.balance && !estate.balance.isZero()).length}
                 </div>
                 <div className="stat-label">Your Investments</div>
@@ -875,7 +822,7 @@ const UserDashboard = ({ walletAddress, chainId }) => {
                             <FontAwesomeIcon icon={faHistory} className="me-1" /> History
                           </Button>
                         </div>
-                        
+
                         <div className="action-buttons mt-2">
                           <Button
                             variant="outline-success"
@@ -903,7 +850,7 @@ const UserDashboard = ({ walletAddress, chainId }) => {
                             <FontAwesomeIcon icon={faTags} className="me-1" /> Sell
                           </Button>
                         </div>
-                        
+
                         <div className="action-buttons mt-2">
                           <Button
                             variant="outline-info"
@@ -930,7 +877,7 @@ const UserDashboard = ({ walletAddress, chainId }) => {
                             <FontAwesomeIcon icon={faMoneyBillTransfer} className="me-1" /> Withdraw
                           </Button>
                         </div>
-                        
+
                         {chainId === 43113 && (
                           <div className="text-center mt-2">
                             <Button
@@ -1149,10 +1096,10 @@ const UserDashboard = ({ walletAddress, chainId }) => {
               <Button variant="outline-primary" onClick={() => setShowRewardModal(false)}>
                 Cancel
               </Button>
-              <Button 
-                variant="primary" 
-                type="submit" 
-                disabled={loading || parseFloat(selectedEstate?.claimableRewards || 0) <= 0} 
+              <Button
+                variant="primary"
+                type="submit"
+                disabled={loading || parseFloat(selectedEstate?.claimableRewards || 0) <= 0}
                 className="px-4"
               >
                 {loading ? <Spinner animation="border" size="sm" /> : 'Claim Rewards'}
@@ -1333,8 +1280,8 @@ const UserDashboard = ({ walletAddress, chainId }) => {
                         <td>{transaction.transactionAmount}</td>
                         <td>{transaction.transactionSymbol}</td>
                         <td className="text-center">
-                          <Button 
-                            variant="outline-info" 
+                          <Button
+                            variant="outline-info"
                             size="sm"
                             onClick={() => window.open(getBlockExplorerUrl(transaction.transactionHash, true), '_blank')}
                             title="View transaction on blockchain explorer"
