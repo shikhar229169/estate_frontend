@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Table, Alert, Spinner, Form, Row, Col, Modal, Container, Badge } from 'react-bootstrap';
 import { ethers } from 'ethers';
 import { getContracts, switchNetwork, getAllTokenizedRealEstates, getERC20Contract } from '../utils/interact';
-import { getEstateOwnerByAddress, updateCollateral, upsertTokenizedPositionData, createTreLog, getUserTreLog } from '../utils/api';
+import { getEstateOwnerByAddress, updateCollateral, upsertTokenizedPositionData, createTreLog, getUserTreLog, createCrossChainTxnLog, getUserCrossChainTxnLogs } from '../utils/api';
 import TokenizedRealEstateABI from '../contracts/abi/TokenizedRealEstate';
 // Import FontAwesome icons
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -36,6 +36,9 @@ const UserDashboard = ({ walletAddress, chainId }) => {
   const [showTransactionHistoryModal, setShowTransactionHistoryModal] = useState(false);
   const [transactionHistory, setTransactionHistory] = useState([]);
   const [loadingTransactionHistory, setLoadingTransactionHistory] = useState(false);
+  const [crossChainTransactions, setCrossChainTransactions] = useState([]);
+  const [showCrossChainHistoryModal, setShowCrossChainHistoryModal] = useState(false);
+  const [loadingCrossChainHistory, setLoadingCrossChainHistory] = useState(false);
 
   useEffect(() => {
     if (window.ethereum) {
@@ -165,6 +168,17 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         );
 
         await tx.wait();
+
+        // log cross-chain data
+        await createCrossChainTxnLog({
+          userAddress: walletAddress,
+          tokenizedRealEstateAddress: selectedEstate.address,
+          transactionType: 'TRE_BUY',
+          transactionAmount: Number(buyAmount),
+          transactionSymbol: 'TRE',
+          transactionHash: tx.hash
+        });
+
         setSuccess(`Cross Chain Purchase Request Placed ${buyAmount} ${selectedEstate.symbol} tokens!`);
       }
 
@@ -253,6 +267,17 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         );
 
         await tx.wait();
+
+        // log cross-chain data
+        await createCrossChainTxnLog({
+          userAddress: walletAddress,
+          tokenizedRealEstateAddress: selectedEstate.address,
+          transactionType: 'TRE_SELL',
+          transactionAmount: Number(sellAmount),
+          transactionSymbol: 'TRE',
+          transactionHash: tx.hash
+        });
+
         setSuccess(`Cross Chain Sell Request Placed ${sellAmount} ${selectedEstate.symbol} tokens!`);
       }
 
@@ -642,6 +667,59 @@ const UserDashboard = ({ walletAddress, chainId }) => {
     XLSX.writeFile(workbook, fileName);
   };
 
+  // Handle viewing cross chain transaction history
+  const handleViewCrossChainHistory = async (estate) => {
+    setSelectedEstate(estate);
+    setShowCrossChainHistoryModal(true);
+    await fetchCrossChainTransactionHistory(estate);
+  };
+
+  // Fetch cross chain transaction history for a specific estate
+  const fetchCrossChainTransactionHistory = async (estate) => {
+    try {
+      setLoadingCrossChainHistory(true);
+      setError('');
+
+      const response = await getUserCrossChainTxnLogs(estate.address, walletAddress);
+      setCrossChainTransactions(response);
+    } catch (error) {
+      console.error('Error fetching cross chain transaction history:', error);
+      setError('Failed to load cross chain transaction history. Please try again.');
+    } finally {
+      setLoadingCrossChainHistory(false);
+    }
+  };
+
+  // Export cross chain transaction history to Excel
+  const exportCrossChainToExcel = () => {
+    if (!crossChainTransactions || crossChainTransactions.length === 0 || !selectedEstate || !walletAddress) return;
+
+    // Create worksheet data
+    const worksheetData = crossChainTransactions.map(transaction => ({
+      'Date': formatDate(transaction.createdAt),
+      'Transaction Type': transaction.transactionType,
+      'Amount': transaction.transactionAmount,
+      'Token': transaction.transactionSymbol,
+      'Transaction Hash': transaction.transactionHash,
+      'CCIP Link': transaction.ccipLink || 'N/A'
+    }));
+
+    // Create a new workbook and add the data
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'CrossChainTxs');
+
+    // Generate file name
+    const shortTreAddress = selectedEstate.address.slice(0, 10);
+    const shortUserAddress = walletAddress.slice(0, 10);
+    const fileName = `crosschain-log-${shortTreAddress}-${shortUserAddress}.xlsx`;
+
+    // Export to file
+    XLSX.writeFile(workbook, fileName);
+  };
+
   const handleNetworkSwitch = async (targetChainId) => {
     try {
       setLoading(true);
@@ -803,7 +881,8 @@ const UserDashboard = ({ walletAddress, chainId }) => {
                       </div>
 
                       <div className="property-actions">
-                        <div className="action-buttons">
+                        {/* First row - Information buttons */}
+                        <div className="action-row">
                           <Button
                             variant="outline-primary"
                             onClick={() => handleViewDetails(estate)}
@@ -823,7 +902,8 @@ const UserDashboard = ({ walletAddress, chainId }) => {
                           </Button>
                         </div>
 
-                        <div className="action-buttons mt-2">
+                        {/* Second row - Trading buttons */}
+                        <div className="action-row">
                           <Button
                             variant="outline-success"
                             onClick={() => {
@@ -851,7 +931,8 @@ const UserDashboard = ({ walletAddress, chainId }) => {
                           </Button>
                         </div>
 
-                        <div className="action-buttons mt-2">
+                        {/* Third row - Collateral buttons */}
+                        <div className="action-row">
                           <Button
                             variant="outline-info"
                             onClick={() => {
@@ -878,8 +959,9 @@ const UserDashboard = ({ walletAddress, chainId }) => {
                           </Button>
                         </div>
 
+                        {/* Special buttons - Single or full-width buttons */}
                         {chainId === 43113 && (
-                          <div className="text-center mt-2">
+                          <div className="action-row">
                             <Button
                               variant="outline-primary"
                               onClick={() => {
@@ -891,6 +973,19 @@ const UserDashboard = ({ walletAddress, chainId }) => {
                               disabled={parseFloat(estate.claimableRewards || 0) <= 0}
                             >
                               <FontAwesomeIcon icon={faMoneyCheckDollar} className="me-1" /> Claim Rewards
+                            </Button>
+                          </div>
+                        )}
+
+                        {currentChainId !== 43113 && (
+                          <div className="action-row">
+                            <Button
+                              variant="outline-info"
+                              onClick={() => handleViewCrossChainHistory(estate)}
+                              className="btn-action btn-claim"
+                              size="md"
+                            >
+                              <FontAwesomeIcon icon={faHistory} className="me-1" /> Cross-Chain
                             </Button>
                           </div>
                         )}
@@ -1313,6 +1408,105 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         </Modal.Footer>
       </Modal>
 
+      {/* Cross Chain Transaction History Modal */}
+      <Modal show={showCrossChainHistoryModal} onHide={() => setShowCrossChainHistoryModal(false)} centered size="lg" className="history-modal">
+        <Modal.Header closeButton className="history-modal-header">
+          <Modal.Title>
+            <FontAwesomeIcon icon={faHistory} className="me-2" />
+            Cross-Chain Transaction History - {selectedEstate?.name} ({selectedEstate?.symbol})
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="history-modal-body">
+          {loadingCrossChainHistory ? (
+            <div className="text-center py-4">
+              <div className="custom-spinner"></div>
+              <p className="mt-3">Loading cross-chain transaction history...</p>
+            </div>
+          ) : crossChainTransactions && crossChainTransactions.length > 0 ? (
+            <>
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <div className="history-summary">
+                  <span className="history-count">{crossChainTransactions.length}</span> cross-chain transactions found
+                </div>
+                <Button
+                  variant="success"
+                  size="sm"
+                  onClick={exportCrossChainToExcel}
+                  className="export-btn"
+                >
+                  <FontAwesomeIcon icon={faDownload} className="me-2" />
+                  Export Excel
+                </Button>
+              </div>
+              <div className="transaction-table-wrapper">
+                <Table responsive bordered hover className="transaction-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Type</th>
+                      <th>Amount</th>
+                      <th>Token</th>
+                      <th className="text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {crossChainTransactions.map((transaction, index) => (
+                      <tr key={index}>
+                        <td>{formatDate(transaction.createdAt)}</td>
+                        <td>
+                          <span className={`badge bg-${getTransactionBadgeColor(transaction.transactionType)}`}>
+                            {transaction.transactionType}
+                          </span>
+                        </td>
+                        <td>{transaction.transactionAmount}</td>
+                        <td>{transaction.transactionSymbol}</td>
+                        <td className="text-center">
+                          <div className="d-flex flex-column gap-2">
+                            <Button
+                              variant="outline-info"
+                              size="sm"
+                              onClick={() => window.open(getBlockExplorerUrl(transaction.transactionHash, true), '_blank')}
+                              title="View transaction on blockchain explorer"
+                              className="transaction-view-btn"
+                            >
+                              View Transaction
+                            </Button>
+                            {transaction.ccipLink && (
+                              <Button
+                                variant="outline-primary"
+                                size="sm"
+                                onClick={() => window.open(transaction.ccipLink, '_blank')}
+                                title="View CCIP transaction details"
+                                className="transaction-view-btn"
+                              >
+                                View CCIP Link
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
+            </>
+          ) : (
+            <div className="empty-history">
+              <div className="empty-history-icon">
+                <FontAwesomeIcon icon={faHistory} />
+              </div>
+              <h4>No Cross-Chain Transaction History</h4>
+              <p>You haven't made any cross-chain transactions with this property yet</p>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowCrossChainHistoryModal(false)} className="btn-close-modal">
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
       <style jsx="true">{`
         .user-dashboard {
           background-color: #f8fafc;
@@ -1567,26 +1761,38 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         .property-actions {
           padding-top: 1rem;
           border-top: 1px solid #f1f3f5;
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
         }
         
-        .action-buttons {
+        .action-row {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 0.75rem;
+          width: 100%;
         }
         
         .btn-action {
           border-radius: 8px;
           font-weight: 500;
           transition: all 0.3s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
         
         .btn-action:hover:not(:disabled) {
           transform: translateY(-3px);
+          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn-action svg {
+          margin-right: 6px;
         }
         
         .btn-claim {
-          width: 100%;
+          grid-column: span 2;
         }
         
         /* Modals styling */
@@ -1871,6 +2077,12 @@ const UserDashboard = ({ walletAddress, chainId }) => {
           padding: 0.25rem 0.75rem;
           font-size: 0.8rem;
           font-weight: 500;
+          margin-bottom: 0.25rem;
+          width: 100%;
+        }
+        
+        .transaction-view-btn:last-child {
+          margin-bottom: 0;
         }
         
         .empty-history {
@@ -1950,8 +2162,8 @@ const UserDashboard = ({ walletAddress, chainId }) => {
             font-size: 1.2rem;
           }
           
-          .property-actions .action-buttons {
-            grid-template-columns: 1fr;
+          .property-actions .action-row {
+            grid-template-columns: 1fr 1fr;
           }
           
           .network-switcher {
@@ -1965,8 +2177,12 @@ const UserDashboard = ({ walletAddress, chainId }) => {
         }
         
         @media (max-width: 576px) {
-          .action-buttons {
+          .action-row {
             grid-template-columns: 1fr;
+          }
+          
+          .btn-claim {
+            grid-column: span 1;
           }
         }
       `}</style>

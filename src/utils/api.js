@@ -541,6 +541,28 @@ export const getUserTreLog = async(tokenizedRealEstateAddress, userAddress) => {
   }
 }
 
+export const createCrossChainTxnLog = async(data) => {
+  try {
+    const response = await api.post('/user/cross-chain-txn/add', data, { headers: { 'x-api-key': 123 } });
+    return response.data;
+  }
+  catch (error) {
+    console.error('Error Creating Cross Chain Txn log', error);
+    throw error;
+  }
+}
+
+export const getUserCrossChainTxnLogs = async(tokenizedRealEstateAddress, userAddress) => {
+  try {
+    const response = await api.get(`/user/cross-chain-txn/detail?tokenizedRealEstateAddress=${tokenizedRealEstateAddress}&userAddress=${userAddress}`, { headers: { 'x-api-key': 123 } });
+    return response.data.data.crossChainTxns;
+  }
+  catch (error) {
+    console.error('Error fetching User Cross Chain Txn Log', error);
+    throw error;
+  }
+}
+
 export const updateEstateOwnerByNode = async (userId) => {
   try {
     const response = await api.patch(`/node/users/${userId}/verify`)
